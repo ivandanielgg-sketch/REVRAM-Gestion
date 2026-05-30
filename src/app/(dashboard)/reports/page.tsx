@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,9 +21,11 @@ import { formatDate } from "@/lib/utils";
 import {
   TREND_METRICS,
   TREND_GROUP_LABELS,
+  STANDARD_BOILER_METRICS,
   PERIOD_LABELS,
   type TrendPeriod,
   type TrendMetric,
+  type IncidentPoint,
 } from "@/lib/report-metrics";
 import {
   ALERT_SEVERITY_LABELS,
@@ -79,7 +83,9 @@ interface TrendsReport {
   startDate?: string;
   endDate?: string;
   trends: Record<string, string | number>[];
+  incidents: IncidentPoint[];
   recordCount: number;
+  totalIncidents: number;
 }
 
 interface ListReport {
@@ -171,68 +177,111 @@ function MetricChart({
 
 function TrendsView({ data }: { data: TrendsReport }) {
   const groups = Object.keys(TREND_GROUP_LABELS) as TrendMetric["group"][];
+  const hasLogs = data.recordCount > 0;
+  const hasIncidents = data.totalIncidents > 0;
 
-  if (data.recordCount === 0) {
+  if (!hasLogs && !hasIncidents) {
     return (
-      <EmptyState message="No hay bitácoras aprobadas en el periodo seleccionado. Registre y apruebe bitácoras para ver tendencias." />
+      <EmptyState message="No hay bitácoras ni incidencias en el periodo seleccionado." />
     );
   }
 
+  const standardVisible = STANDARD_BOILER_METRICS.filter((m) =>
+    data.trends.some((d) => typeof d[m.key] === "number")
+  );
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Registros analizados" value={data.recordCount} />
+        <StatCard label="Incidencias totales" value={data.totalIncidents} accent="warning" />
         <StatCard label="Periodo" value={PERIOD_LABELS[data.period]} />
         <StatCard label="Puntos en gráfica" value={data.trends.length} />
       </div>
 
-      {groups.map((group) => {
-        const metrics = TREND_METRICS.filter((m) => m.group === group);
-        const visible = metrics.filter((m) =>
-          data.trends.some((d) => typeof d[m.key] === "number")
-        );
-        if (visible.length === 0) return null;
-
-        return (
-          <Card key={group} title={TREND_GROUP_LABELS[group]}>
-            <div className="grid gap-4 md:grid-cols-2">
-              {visible.map((metric) => (
-                <MetricChart key={metric.key} data={data.trends} metric={metric} />
-              ))}
-            </div>
-          </Card>
-        );
-      })}
-
-      <Card title="Resumen comparativo">
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={data.trends}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {TREND_METRICS.filter((m) =>
-              data.trends.some((d) => typeof d[m.key] === "number")
-            )
-              .slice(0, 6)
-              .map((m) => (
+      {standardVisible.length > 0 && (
+        <Card title="Parámetros principales de caldera">
+          <p className="mb-4 text-sm text-slate-600">
+            Tendencia de presión, temperatura, nivel de agua y parámetros clave para comparación visual.
+          </p>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={data.trends}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {standardVisible.map((m) => (
                 <Line
                   key={m.key}
                   type="monotone"
                   dataKey={m.key}
-                  name={m.label}
+                  name={`${m.label}${m.unit ? ` (${m.unit})` : ""}`}
                   stroke={m.color}
-                  dot={false}
-                  strokeWidth={1.5}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
                 />
               ))}
-          </LineChart>
-        </ResponsiveContainer>
-        <p className="mt-2 text-xs text-slate-500">
-          Vista comparativa de los parámetros principales con datos registrados en el periodo.
-        </p>
-      </Card>
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {standardVisible.slice(0, 3).map((metric) => (
+              <MetricChart key={metric.key} data={data.trends} metric={metric} />
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {hasIncidents && (
+        <Card title="Incidencias por periodo">
+          <p className="mb-4 text-sm text-slate-600">
+            Número de alertas registradas agrupadas por día, mes o año según el rango seleccionado.
+          </p>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data.incidents}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="critico" name="Crítico" stackId="a" fill="#dc2626" />
+              <Bar dataKey="advertencia" name="Advertencia" stackId="a" fill="#ca8a04" />
+              <Bar dataKey="informativo" name="Informativo" stackId="a" fill="#2563eb" />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-6">
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={data.incidents}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="total" name="Total incidencias" stroke="#334155" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      {hasLogs &&
+        groups.map((group) => {
+          const metrics = TREND_METRICS.filter((m) => m.group === group);
+          const visible = metrics.filter((m) =>
+            data.trends.some((d) => typeof d[m.key] === "number")
+          );
+          if (visible.length === 0) return null;
+
+          return (
+            <Card key={group} title={TREND_GROUP_LABELS[group]}>
+              <div className="grid gap-4 md:grid-cols-2">
+                {visible.map((metric) => (
+                  <MetricChart key={metric.key} data={data.trends} metric={metric} />
+                ))}
+              </div>
+            </Card>
+          );
+        })}
     </div>
   );
 }
@@ -326,7 +375,7 @@ function LogsView({ logs }: { logs: DailyLog[] }) {
 }
 
 export default function ReportsPage() {
-  const [reportType, setReportType] = useState<ReportType>("daily");
+  const [reportType, setReportType] = useState<ReportType>("trends");
   const [period, setPeriod] = useState<TrendPeriod>("week");
   const [boilerId, setBoilerId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -427,7 +476,7 @@ export default function ReportsPage() {
             onChange={(e) => setReportType(e.target.value as ReportType)}
           >
             <option value="daily">Resumen diario</option>
-            <option value="trends">Tendencias y gráficas</option>
+            <option value="trends">Panel gráfico (tendencias e incidencias)</option>
             <option value="open-alerts">Alertas abiertas</option>
             <option value="pending-approval">Pendientes de aprobación</option>
             <option value="critical-events">Eventos críticos</option>

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
   aggregateTrendDataWithBucket,
+  aggregateIncidentsWithBucket,
   parseDateParam,
   resolveDateRange,
   type TrendPeriod,
@@ -89,7 +90,17 @@ export async function fetchReportData(query: ReportQuery) {
       orderBy: { logDate: "asc" },
     });
 
+    const alerts = await prisma.alert.findMany({
+      where: {
+        ...boilerFilter,
+        alertDate: { gte: start, lte: end },
+      },
+      select: { alertDate: true, severity: true },
+      orderBy: { alertDate: "asc" },
+    });
+
     const trends = aggregateTrendDataWithBucket(logs, bucket);
+    const incidents = aggregateIncidentsWithBucket(alerts, bucket);
 
     return {
       type,
@@ -97,7 +108,9 @@ export async function fetchReportData(query: ReportQuery) {
       startDate: start.toISOString().slice(0, 10),
       endDate: end.toISOString().slice(0, 10),
       trends,
+      incidents,
       recordCount: logs.length,
+      totalIncidents: alerts.length,
     };
   }
 

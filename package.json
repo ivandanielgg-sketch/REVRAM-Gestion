@@ -15,7 +15,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "reset-admin": "tsx prisma/reset-admin-password.ts"
+    "reset-admin": "tsx prisma/reset-admin-password.ts",
+    "ensure-users": "tsx prisma/ensure-users.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
