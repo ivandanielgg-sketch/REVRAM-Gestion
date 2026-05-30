@@ -1,4 +1,4 @@
-export type TrendPeriod = "day" | "week" | "month" | "year";
+export type TrendPeriod = "day" | "week" | "month" | "year" | "custom";
 
 export interface TrendMetric {
   key: string;
@@ -44,7 +44,44 @@ export const PERIOD_LABELS: Record<TrendPeriod, string> = {
   week: "Semana (7 días)",
   month: "Mes (30 días)",
   year: "Año (12 meses)",
+  custom: "Rango personalizado",
 };
+
+export function parseDateParam(value: string | null | undefined, endOfDay = false): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return undefined;
+  if (endOfDay) d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+export function getBucketForRange(start: Date, end: Date): "hour" | "day" | "month" {
+  const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays <= 2) return "hour";
+  if (diffDays <= 90) return "day";
+  return "month";
+}
+
+export function resolveDateRange(
+  period: TrendPeriod,
+  startDate?: string | null,
+  endDate?: string | null
+): { start: Date; end: Date; bucket: "hour" | "day" | "month" } {
+  if (period === "custom" || startDate || endDate) {
+    const end = parseDateParam(endDate, true) ?? new Date();
+    const start =
+      parseDateParam(startDate) ??
+      (() => {
+        const s = new Date(end);
+        s.setDate(s.getDate() - 29);
+        s.setHours(0, 0, 0, 0);
+        return s;
+      })();
+    start.setHours(0, 0, 0, 0);
+    return { start, end, bucket: getBucketForRange(start, end) };
+  }
+  return getPeriodRange(period);
+}
 
 interface LogRow {
   logDate: Date | string;
@@ -74,7 +111,9 @@ interface LogRow {
   } | null;
 }
 
-export function getPeriodRange(period: TrendPeriod): { start: Date; end: Date; bucket: "hour" | "day" | "month" } {
+export function getPeriodRange(
+  period: Exclude<TrendPeriod, "custom">
+): { start: Date; end: Date; bucket: "hour" | "day" | "month" } {
   const end = new Date();
   const start = new Date();
 
@@ -142,9 +181,21 @@ function average(values: number[]): number {
 
 export function aggregateTrendData(
   logs: LogRow[],
-  period: TrendPeriod
+  period: Exclude<TrendPeriod, "custom">,
+  customStart?: Date,
+  customEnd?: Date
 ): { label: string; count: number; [key: string]: string | number }[] {
-  const { bucket } = getPeriodRange(period);
+  const bucket =
+    customStart && customEnd
+      ? getBucketForRange(customStart, customEnd)
+      : getPeriodRange(period).bucket;
+  return aggregateTrendDataWithBucket(logs, bucket);
+}
+
+export function aggregateTrendDataWithBucket(
+  logs: LogRow[],
+  bucket: "hour" | "day" | "month"
+): { label: string; count: number; [key: string]: string | number }[] {
   const buckets = new Map<string, Map<string, number[]>>();
 
   for (const log of logs) {
