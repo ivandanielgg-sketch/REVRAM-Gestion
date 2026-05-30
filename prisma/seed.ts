@@ -1,12 +1,15 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import pg from "pg";
 import bcrypt from "bcryptjs";
 import { SAFETY_CHECKLIST_ITEMS } from "../src/lib/constants";
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!,
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
 });
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
