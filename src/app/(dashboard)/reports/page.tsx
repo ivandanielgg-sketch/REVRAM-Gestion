@@ -16,6 +16,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceArea,
+  ReferenceLine,
 } from "recharts";
 import { formatDate } from "@/lib/utils";
 import {
@@ -27,6 +29,7 @@ import {
   type TrendMetric,
   type IncidentPoint,
 } from "@/lib/report-metrics";
+import type { MetricLimitBand } from "@/lib/operating-limit-bands";
 import {
   ALERT_SEVERITY_LABELS,
   LOG_STATUS_LABELS,
@@ -84,6 +87,8 @@ interface TrendsReport {
   endDate?: string;
   trends: Record<string, string | number>[];
   incidents: IncidentPoint[];
+  operatingLimits?: Record<string, MetricLimitBand>;
+  limitsLabel?: string | null;
   recordCount: number;
   totalIncidents: number;
 }
@@ -134,12 +139,54 @@ function DataTable({
   );
 }
 
+function LimitBands({ band }: { band?: MetricLimitBand }) {
+  if (!band || (band.min == null && band.max == null)) return null;
+
+  const y1 = band.min ?? band.max!;
+  const y2 = band.max ?? band.min!;
+
+  return (
+    <>
+      {band.min != null && band.max != null && (
+        <ReferenceArea
+          y1={band.min}
+          y2={band.max}
+          fill="#22c55e"
+          fillOpacity={0.15}
+          strokeOpacity={0}
+          ifOverflow="extendDomain"
+        />
+      )}
+      {band.min != null && (
+        <ReferenceLine
+          y={band.min}
+          stroke="#16a34a"
+          strokeDasharray="5 5"
+          strokeWidth={1.5}
+          label={{ value: "Mín", position: "insideTopLeft", fontSize: 9, fill: "#16a34a" }}
+        />
+      )}
+      {band.max != null && (
+        <ReferenceLine
+          y={band.max}
+          stroke="#dc2626"
+          strokeDasharray="5 5"
+          strokeWidth={1.5}
+          label={{ value: "Máx", position: "insideTopLeft", fontSize: 9, fill: "#dc2626" }}
+        />
+      )}
+    </>
+  );
+}
+
 function MetricChart({
   data,
   metric,
+  limitBand,
 }: {
   data: Record<string, string | number>[];
   metric: TrendMetric;
+  limitBand?: MetricLimitBand;
 }) {
   const hasData = data.some((d) => typeof d[metric.key] === "number");
   if (!hasData) return null;
@@ -149,18 +196,28 @@ function MetricChart({
       <p className="mb-2 text-xs font-medium text-slate-600">
         {metric.label}
         {metric.unit ? ` (${metric.unit})` : ""}
+        {limitBand && (limitBand.min != null || limitBand.max != null) && (
+          <span className="ml-2 text-slate-400">
+            {limitBand.min != null && limitBand.max != null
+              ? `[${limitBand.min} – ${limitBand.max}]`
+              : limitBand.max != null
+                ? `máx ${limitBand.max}`
+                : `mín ${limitBand.min}`}
+          </span>
+        )}
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} width={45} />
+          <YAxis tick={{ fontSize: 10 }} width={45} domain={["auto", "auto"]} />
           <Tooltip
             formatter={(value) => [
               typeof value === "number" ? value.toLocaleString("es-MX") : value,
               metric.label,
             ]}
           />
+          <LimitBands band={limitBand} />
           <Line
             type="monotone"
             dataKey={metric.key}
@@ -179,6 +236,8 @@ function TrendsView({ data }: { data: TrendsReport }) {
   const groups = Object.keys(TREND_GROUP_LABELS) as TrendMetric["group"][];
   const hasLogs = data.recordCount > 0;
   const hasIncidents = data.totalIncidents > 0;
+  const limits = data.operatingLimits ?? {};
+  const hasLimits = Object.keys(limits).length > 0;
 
   if (!hasLogs && !hasIncidents) {
     return (
@@ -199,34 +258,38 @@ function TrendsView({ data }: { data: TrendsReport }) {
         <StatCard label="Puntos en gráfica" value={data.trends.length} />
       </div>
 
+      {hasLimits && data.limitsLabel && (
+        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-xs text-green-900">
+          <span>{data.limitsLabel}</span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-3 w-6 rounded bg-green-500/20 border border-green-500/40" />
+            Rango operativo
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-green-600" />
+            Mínimo
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-red-600" />
+            Máximo
+          </span>
+        </div>
+      )}
+
       {standardVisible.length > 0 && (
         <Card title="Parámetros principales de caldera">
           <p className="mb-4 text-sm text-slate-600">
-            Tendencia de presión, temperatura, nivel de agua y parámetros clave para comparación visual.
+            Tendencia de presión, temperatura, nivel de agua y parámetros clave. Las gráficas
+            individuales muestran bandas de límites operativos cuando están configurados.
           </p>
-          <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={data.trends}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {standardVisible.map((m) => (
-                <Line
-                  key={m.key}
-                  type="monotone"
-                  dataKey={m.key}
-                  name={`${m.label}${m.unit ? ` (${m.unit})` : ""}`}
-                  stroke={m.color}
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            {standardVisible.slice(0, 3).map((metric) => (
-              <MetricChart key={metric.key} data={data.trends} metric={metric} />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {standardVisible.map((metric) => (
+              <MetricChart
+                key={metric.key}
+                data={data.trends}
+                metric={metric}
+                limitBand={limits[metric.key]}
+              />
             ))}
           </div>
         </Card>
@@ -275,9 +338,14 @@ function TrendsView({ data }: { data: TrendsReport }) {
           return (
             <Card key={group} title={TREND_GROUP_LABELS[group]}>
               <div className="grid gap-4 md:grid-cols-2">
-                {visible.map((metric) => (
-                  <MetricChart key={metric.key} data={data.trends} metric={metric} />
-                ))}
+              {visible.map((metric) => (
+                <MetricChart
+                  key={metric.key}
+                  data={data.trends}
+                  metric={metric}
+                  limitBand={limits[metric.key]}
+                />
+              ))}
               </div>
             </Card>
           );
