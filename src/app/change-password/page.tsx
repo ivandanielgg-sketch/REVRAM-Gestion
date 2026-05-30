@@ -11,27 +11,73 @@ export default function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    const res = await fetch("/api/auth/change-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error);
-      setLoading(false);
+  function validateClient(): string | null {
+    if (!currentPassword.trim()) {
+      return "La contraseña actual es requerida";
+    }
+    if (newPassword.length < 8) {
+      return "La nueva contraseña debe tener al menos 8 caracteres";
+    }
+    if (newPassword !== confirmPassword) {
+      return "Las contraseñas nuevas no coinciden";
+    }
+    if (newPassword === currentPassword) {
+      return "La nueva contraseña no puede ser igual a la contraseña actual";
+    }
+    return null;
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    const clientError = validateClient();
+    if (clientError) {
+      setError(clientError);
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("No se pudo cambiar la contraseña. Intente nuevamente.");
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo cambiar la contraseña");
+      }
+
+      setSuccess(data.message || "Contraseña actualizada correctamente");
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  const isFormInvalid =
+    !currentPassword.trim() ||
+    newPassword.length < 8 ||
+    !confirmPassword.trim() ||
+    newPassword !== confirmPassword;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100">
@@ -53,6 +99,8 @@ export default function ChangePasswordPage() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
+                autoComplete="current-password"
+                disabled={isSubmitting}
               />
             </div>
             <div>
@@ -64,6 +112,8 @@ export default function ChangePasswordPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={8}
+                autoComplete="new-password"
+                disabled={isSubmitting}
               />
             </div>
             <div>
@@ -74,11 +124,26 @@ export default function ChangePasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                autoComplete="new-password"
+                disabled={isSubmitting}
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              Cambiar contraseña
+            {error && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            )}
+            {success && (
+              <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                {success}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || isFormInvalid}
+            >
+              {isSubmitting ? "Cambiando..." : "Cambiar contraseña"}
             </Button>
           </form>
         </div>

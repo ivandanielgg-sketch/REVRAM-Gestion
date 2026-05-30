@@ -7,13 +7,17 @@ export const loginSchema = z.object({
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1),
-    newPassword: z.string().min(8, "Mínimo 8 caracteres"),
-    confirmPassword: z.string().min(1),
+    currentPassword: z.string().min(1, "La contraseña actual es requerida"),
+    newPassword: z.string().min(8, "La nueva contraseña debe tener al menos 8 caracteres"),
+    confirmPassword: z.string().min(1, "Confirme la nueva contraseña"),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
-    message: "Las contraseñas no coinciden",
+    message: "Las contraseñas nuevas no coinciden",
     path: ["confirmPassword"],
+  })
+  .refine((d) => d.newPassword !== d.currentPassword, {
+    message: "La nueva contraseña no puede ser igual a la contraseña actual",
+    path: ["newPassword"],
   });
 
 export const forgotPasswordSchema = z.object({
