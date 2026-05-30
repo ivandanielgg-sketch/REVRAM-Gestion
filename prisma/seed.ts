@@ -18,8 +18,6 @@ async function main() {
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {
-      passwordHash,
-      mustChangePassword: true,
       isActive: true,
     },
     create: {
@@ -157,6 +155,16 @@ async function main() {
       update: {},
       create: p,
     });
+  }
+
+  const demoDataExists = await prisma.maintenanceOrder.findUnique({
+    where: { orderNumber: "OM-DEMO-001" },
+  });
+
+  if (demoDataExists) {
+    console.log("Demo data already exists, skipping sample logs and orders.");
+    console.log("Admin: admin (use npm run reset-admin to restore cambiar123)");
+    return;
   }
 
   await prisma.boilerLog.create({
