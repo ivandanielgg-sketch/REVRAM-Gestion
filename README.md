@@ -107,6 +107,43 @@ npm run db:deploy    # Migraciones producción
 npm run db:seed      # Datos iniciales
 ```
 
+## Solución: puerto 3000 ocupado (`EADDRINUSE`)
+
+Si al ejecutar `npm start` o `npm run dev` aparece:
+
+```
+Error: listen EADDRINUSE: address already in use :::3000
+```
+
+significa que **otro proceso ya usa el puerto 3000** (por ejemplo, otra instancia de `next dev` o `npm start` que quedó en segundo plano). No es un error de compilación ni de Prisma.
+
+### Liberar el puerto 3000
+
+**Mac / Linux:**
+
+```bash
+lsof -i :3000
+kill -9 $(lsof -ti :3000)
+```
+
+### Usar otro puerto
+
+**Producción local:**
+
+```bash
+PORT=3001 npm start
+```
+
+**Desarrollo:**
+
+```bash
+npm run dev -- -p 3001
+```
+
+### Render y variable `PORT`
+
+En Render, la plataforma asigna automáticamente la variable de entorno `PORT`. Next.js la detecta en `npm start` **sin configuración adicional**. No hay puerto hardcodeado en el código del servidor; el valor `3000` en `.env.example` y `APP_URL` solo aplica a la URL pública para enlaces (correos, etc.), no al puerto de escucha.
+
 ## Despliegue en Render
 
 Ver [README-DEPLOY.md](./README-DEPLOY.md) para instrucciones detalladas.
