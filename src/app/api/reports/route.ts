@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import {
+  aggregateTrendData,
+  getPeriodRange,
+  type TrendPeriod,
+} from "@/lib/report-metrics";
+
+const VALID_PERIODS: TrendPeriod[] = ["day", "week", "month", "year"];
 
 export async function GET(request: NextRequest) {
   const { error } = await requirePermission(request, "reports.view");
@@ -8,69 +15,68 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type") || "daily";
-  const boilerId = searchParams.get("boilerId");
-  const startDate = searchParams.get("startDate");
-  const endDate = searchParams.get("endDate");
+  const boilerId = searchParams.get("boilerId") || undefined;
+  const periodParam = searchParams.get("period") || "week";
+  const period = VALID_PERIODS.includes(periodParam as TrendPeriod)
+    ? (periodParam as TrendPeriod)
+    : "week";
 
-  const dateFilter =
-    startDate || endDate
-      ? {
-          gte: startDate ? new Date(startDate) : undefined,
-          lte: endDate ? new Date(endDate) : undefined,
-        }
-      : undefined;
+  const boilerFilter = boilerId ? { boilerId } : {};
 
   if (type === "open-alerts") {
     const alerts = await prisma.alert.findMany({
-      where: { status: { in: ["ABIERTA", "EN_REVISION"] }, ...(boilerId ? { boilerId } : {}) },
+      where: { status: { in: ["ABIERTA", "EN_REVISION"] }, ...boilerFilter },
       include: { boiler: true, capturedBy: { select: { username: true } } },
       orderBy: { alertDate: "desc" },
     });
-    return NextResponse.json({ alerts });
+    return NextResponse.json({ type, alerts, total: alerts.length });
   }
 
   if (type === "pending-approval") {
     const logs = await prisma.boilerLog.findMany({
-      where: { status: { in: ["ENVIADO", "REVISADO"] } },
+      where: {
+        status: { in: ["ENVIADO", "REVISADO"] },
+        ...(boilerId ? { boilerId } : {}),
+      },
       include: { boiler: true, operator: { select: { username: true } } },
       orderBy: { logDate: "desc" },
     });
-    return NextResponse.json({ logs });
+    return NextResponse.json({ type, logs, total: logs.length });
   }
 
   if (type === "critical-events") {
     const alerts = await prisma.alert.findMany({
-      where: { severity: "CRITICO", ...(boilerId ? { boilerId } : {}) },
-      include: { boiler: true },
+      where: { severity: "CRITICO", ...boilerFilter },
+      include: { boiler: true, capturedBy: { select: { username: true } } },
       orderBy: { alertDate: "desc" },
-      take: 50,
+      take: 100,
     });
-    return NextResponse.json({ alerts });
+    return NextResponse.json({ type, alerts, total: alerts.length });
   }
 
   if (type === "trends") {
+    const { start, end } = getPeriodRange(period);
+
     const logs = await prisma.boilerLog.findMany({
       where: {
-        ...(boilerId ? { boilerId } : {}),
-        ...(dateFilter ? { logDate: dateFilter } : {}),
-        status: "APROBADO",
+        ...boilerFilter,
+        logDate: { gte: start, lte: end },
+        status: { in: ["APROBADO", "REVISADO", "ENVIADO"] },
       },
       include: { combustion: true, waterTreatment: true },
       orderBy: { logDate: "asc" },
-      take: 200,
     });
 
-    const trends = logs.map((l) => ({
-      date: l.logDate,
-      steamPressure: l.steamPressure,
-      flueGasTemperature: l.combustion?.flueGasTemperature,
-      o2: l.combustion?.o2,
-      co: l.combustion?.co,
-      conductivity: l.waterTreatment?.conductivity,
-      ph: l.waterTreatment?.ph,
-    }));
+    const trends = aggregateTrendData(logs, period);
 
-    return NextResponse.json({ trends });
+    return NextResponse.json({
+      type,
+      period,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      trends,
+      recordCount: logs.length,
+    });
   }
 
   const today = new Date();
@@ -78,28 +84,43 @@ export async function GET(request: NextRequest) {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [logs, alerts, boilers] = await Promise.all([
+  const [logs, alerts, boilersOperating] = await Promise.all([
     prisma.boilerLog.findMany({
       where: {
         logDate: { gte: today, lt: tomorrow },
-        ...(boilerId ? { boilerId } : {}),
+        ...boilerFilter,
       },
-      include: { boiler: true, operator: { select: { username: true } } },
+      include: {
+        boiler: true,
+        operator: { select: { username: true } },
+        combustion: true,
+        waterTreatment: true,
+      },
+      orderBy: { logDate: "desc" },
     }),
     prisma.alert.findMany({
       where: {
         alertDate: { gte: today, lt: tomorrow },
-        ...(boilerId ? { boilerId } : {}),
+        ...boilerFilter,
       },
+      include: { boiler: true, capturedBy: { select: { username: true } } },
+      orderBy: { alertDate: "desc" },
     }),
     prisma.boiler.count({ where: { status: "OPERANDO" } }),
   ]);
 
+  const openAlerts = alerts.filter((a) => a.status === "ABIERTA" || a.status === "EN_REVISION").length;
+  const criticalAlerts = alerts.filter((a) => a.severity === "CRITICO").length;
+
   return NextResponse.json({
+    type: "daily",
+    date: today.toISOString(),
     summary: {
       logsToday: logs.length,
       alertsToday: alerts.length,
-      boilersOperating: boilers,
+      openAlerts,
+      criticalAlerts,
+      boilersOperating,
     },
     logs,
     alerts,
