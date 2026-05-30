@@ -1,68 +1,92 @@
 import type { PrismaClient } from "../src/generated/prisma/client";
 import bcrypt from "bcryptjs";
 
+const REVRAM_COMPANY_ID = "revram-company-001";
+
 /** Garantiza usuarios base del sistema (idempotente, seguro en cada deploy). */
 export async function ensureDefaultUsers(prisma: PrismaClient): Promise<void> {
+  await prisma.company.upsert({
+    where: { id: REVRAM_COMPANY_ID },
+    update: { name: "REVRAM", status: "ACTIVE", deletedAt: null },
+    create: { id: REVRAM_COMPANY_ID, name: "REVRAM", status: "ACTIVE" },
+  });
+
   const passwordHash = await bcrypt.hash("cambiar123", 12);
 
   await prisma.user.upsert({
     where: { username: "admin" },
-    update: { isActive: true },
+    update: {
+      status: "ACTIVE",
+      role: "SUPER_ADMIN",
+      companyId: REVRAM_COMPANY_ID,
+      email: "admin@revram.mx",
+      name: "Administrador REVRAM",
+    },
     create: {
       username: "admin",
-      email: "admin@example.com",
+      email: "admin@revram.mx",
+      name: "Administrador REVRAM",
       passwordHash,
-      role: "ADMINISTRADOR",
+      role: "SUPER_ADMIN",
+      status: "ACTIVE",
+      companyId: REVRAM_COMPANY_ID,
       mustChangePassword: true,
-      isActive: true,
     },
   });
 
   await prisma.user.upsert({
     where: { username: "supervisor" },
-    update: { isActive: true },
+    update: { status: "ACTIVE", companyId: REVRAM_COMPANY_ID },
     create: {
       username: "supervisor",
       email: "supervisor@example.com",
+      name: "Supervisor Demo",
       passwordHash: await bcrypt.hash("supervisor123", 12),
       role: "SUPERVISOR",
-      isActive: true,
+      status: "ACTIVE",
+      companyId: REVRAM_COMPANY_ID,
     },
   });
 
   await prisma.user.upsert({
     where: { username: "operador" },
-    update: { isActive: true },
+    update: { status: "ACTIVE", companyId: REVRAM_COMPANY_ID },
     create: {
       username: "operador",
       email: "operador@example.com",
+      name: "Operador Demo",
       passwordHash: await bcrypt.hash("operador123", 12),
-      role: "OPERADOR",
-      isActive: true,
+      role: "OPERATOR",
+      status: "ACTIVE",
+      companyId: REVRAM_COMPANY_ID,
     },
   });
 
   await prisma.user.upsert({
     where: { username: "mantenimiento" },
-    update: { isActive: true },
+    update: { status: "ACTIVE", companyId: REVRAM_COMPANY_ID },
     create: {
       username: "mantenimiento",
       email: "mantenimiento@example.com",
+      name: "Mantenimiento Demo",
       passwordHash: await bcrypt.hash("mantenimiento123", 12),
-      role: "MANTENIMIENTO",
-      isActive: true,
+      role: "MAINTENANCE",
+      status: "ACTIVE",
+      companyId: REVRAM_COMPANY_ID,
     },
   });
 
   await prisma.user.upsert({
     where: { username: "consulta" },
-    update: { isActive: true },
+    update: { status: "ACTIVE", companyId: REVRAM_COMPANY_ID },
     create: {
       username: "consulta",
       email: "consulta@example.com",
+      name: "Consulta Demo",
       passwordHash: await bcrypt.hash("consulta123", 12),
-      role: "SOLO_CONSULTA",
-      isActive: true,
+      role: "VIEWER",
+      status: "ACTIVE",
+      companyId: REVRAM_COMPANY_ID,
     },
   });
 }

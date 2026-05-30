@@ -4,19 +4,17 @@ import { requirePermission } from "@/lib/api-auth";
 import { boilerSchema, operatingLimitsSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
+import { getBoilerForSession } from "@/lib/tenant-access";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requirePermission(request, "boilers.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "boilers.view");
+  if (error || !session) return error;
 
   const { id } = await params;
-  const boiler = await prisma.boiler.findUnique({
-    where: { id },
-    include: { plant: true, operatingLimits: true },
-  });
+  const boiler = await getBoilerForSession(id, session);
   if (!boiler) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
   return NextResponse.json(boiler);
 }
@@ -29,7 +27,7 @@ export async function PUT(
   if (error || !session) return error;
 
   const { id } = await params;
-  const existing = await prisma.boiler.findUnique({ where: { id } });
+  const existing = await getBoilerForSession(id, session);
   if (!existing) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
   const body = await request.json();
@@ -43,11 +41,12 @@ export async function PUT(
     where: { id },
     data: {
       ...data,
+      companyId: existing.companyId,
       installationDate: data.installationDate ? new Date(data.installationDate) : null,
       lastInspectionDate: data.lastInspectionDate ? new Date(data.lastInspectionDate) : null,
       nextInspectionDate: data.nextInspectionDate ? new Date(data.nextInspectionDate) : null,
     },
-    include: { plant: true, operatingLimits: true },
+    include: { plant: true, operatingLimits: true, company: true },
   });
 
   await createAuditLog({
@@ -71,6 +70,9 @@ export async function PATCH(
   if (error || !session) return error;
 
   const { id } = await params;
+  const boiler = await getBoilerForSession(id, session);
+  if (!boiler) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+
   const body = await request.json();
   const parsed = operatingLimitsSchema.safeParse(body);
   if (!parsed.success) {

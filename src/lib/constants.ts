@@ -20,12 +20,30 @@ export const SAFETY_CHECKLIST_ITEMS = [
   { key: "extinguisher_accessible", label: "Extintor/accesos disponibles" },
 ] as const;
 
+export const BRAND_TITLE = "Sistema de bitácoras inteligentes REVRAM";
+export const BRAND_SUBTITLE = "Sistema de bitácoras inteligentes";
+
 export const ROLE_LABELS: Record<string, string> = {
-  ADMINISTRADOR: "Administrador",
+  SUPER_ADMIN: "Administrador global",
+  COMPANY_ADMIN: "Administrador de empresa",
   SUPERVISOR: "Supervisor",
-  OPERADOR: "Operador",
-  MANTENIMIENTO: "Mantenimiento",
-  SOLO_CONSULTA: "Solo consulta",
+  OPERATOR: "Operador",
+  MAINTENANCE: "Mantenimiento",
+  VIEWER: "Consulta",
+};
+
+export const USER_STATUS_LABELS: Record<string, string> = {
+  PENDING_APPROVAL: "Pendiente",
+  ACTIVE: "Activo",
+  REJECTED: "Rechazado",
+  DISABLED: "Deshabilitado",
+  DELETED: "Eliminado",
+};
+
+export const COMPANY_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Activa",
+  DISABLED: "Deshabilitada",
+  DELETED: "Eliminada",
 };
 
 export const BOILER_TYPE_LABELS: Record<string, string> = {

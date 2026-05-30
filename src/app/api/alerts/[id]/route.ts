@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/api-auth";
 import { closeAlertSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
+import { getAlertForSession } from "@/lib/tenant-access";
 
 export async function PATCH(
   request: NextRequest,
@@ -13,7 +14,7 @@ export async function PATCH(
   if (error || !session) return error;
 
   const { id } = await params;
-  const alert = await prisma.alert.findUnique({ where: { id } });
+  const alert = await getAlertForSession(id, session);
   if (!alert) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
   const body = await request.json();

@@ -10,8 +10,8 @@ const VALID_FORMATS = ["csv", "xlsx", "pdf"] as const;
 type ExportFormat = (typeof VALID_FORMATS)[number];
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "reports.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "reports.view");
+  if (error || !session) return error;
 
   const { searchParams } = new URL(request.url);
   const formatParam = searchParams.get("format") || "xlsx";
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       period,
       startDate: searchParams.get("startDate"),
       endDate: searchParams.get("endDate"),
+      session,
     });
 
     const { buffer, contentType, filename } = generateReportExport(

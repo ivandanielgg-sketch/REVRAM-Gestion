@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
         mustChangePassword: false,
         passwordChangedAt: new Date(),
       },
+      include: { company: true },
     });
 
     await createAuditLog({
@@ -65,7 +66,11 @@ export async function POST(request: NextRequest) {
       id: updated.id,
       username: updated.username,
       email: updated.email,
+      name: updated.name,
       role: updated.role,
+      status: updated.status,
+      companyId: updated.companyId,
+      companyName: updated.company?.name ?? null,
       mustChangePassword: false,
     });
 

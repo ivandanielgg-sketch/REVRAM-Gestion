@@ -4,20 +4,24 @@ import { requirePermission } from "@/lib/api-auth";
 import { maintenanceSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
+import { getMaintenanceForSession } from "@/lib/tenant-access";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requirePermission(request, "maintenance.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "maintenance.view");
+  if (error || !session) return error;
 
   const { id } = await params;
+  const access = await getMaintenanceForSession(id, session);
+  if (!access) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+
   const order = await prisma.maintenanceOrder.findUnique({
     where: { id },
     include: {
       boiler: true,
-      responsible: { select: { id: true, username: true } },
+      responsible: { select: { id: true, username: true, name: true } },
       alert: true,
       boilerLog: { select: { id: true, logDate: true } },
       evidence: true,
@@ -35,7 +39,7 @@ export async function PUT(
   if (error || !session) return error;
 
   const { id } = await params;
-  const existing = await prisma.maintenanceOrder.findUnique({ where: { id } });
+  const existing = await getMaintenanceForSession(id, session);
   if (!existing) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
   const body = await request.json();

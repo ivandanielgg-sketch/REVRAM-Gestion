@@ -19,20 +19,27 @@ async function main() {
   const supervisor = await prisma.user.findUniqueOrThrow({ where: { username: "supervisor" } });
   const operator = await prisma.user.findUniqueOrThrow({ where: { username: "operador" } });
 
+  const revramCompany = await prisma.company.upsert({
+    where: { id: "revram-company-001" },
+    update: {},
+    create: { id: "revram-company-001", name: "REVRAM", status: "ACTIVE" },
+  });
+
   const plant = await prisma.plant.upsert({
     where: { id: "demo-plant-001" },
-    update: {},
+    update: { companyId: revramCompany.id },
     create: {
       id: "demo-plant-001",
       name: "Planta Demo Monterrey",
       client: "Cliente Demo S.A. de C.V.",
       location: "Monterrey, N.L.",
+      companyId: revramCompany.id,
     },
   });
 
   const boiler = await prisma.boiler.upsert({
     where: { internalId: "CAL-001" },
-    update: {},
+    update: { companyId: revramCompany.id },
     create: {
       internalId: "CAL-001",
       name: "Caldera Demo CB-200",
@@ -49,6 +56,7 @@ async function main() {
       location: "Cuarto de calderas - Planta 1",
       status: "OPERANDO",
       plantId: plant.id,
+      companyId: revramCompany.id,
       technicalNotes: "Caldera demo para pruebas del sistema de bitácora.",
     },
   });

@@ -17,7 +17,8 @@ async function main() {
     data: {
       passwordHash,
       mustChangePassword: true,
-      isActive: true,
+      status: "ACTIVE",
+      role: "SUPER_ADMIN",
       passwordChangedAt: null,
     },
   });

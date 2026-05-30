@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
+import type { SessionUser } from "@/lib/session";
+import { mergeCompanyLogWhere } from "@/lib/tenant-access";
 
 export interface LogsFilterParams {
   startDate?: string | null;
@@ -17,8 +19,11 @@ export interface LogsFilterParams {
   sortOrder?: string | null;
 }
 
-export function buildLogsWhere(filters: LogsFilterParams): Prisma.BoilerLogWhereInput {
-  const where: Prisma.BoilerLogWhereInput = {};
+export function buildLogsWhere(
+  filters: LogsFilterParams,
+  session?: SessionUser
+): Prisma.BoilerLogWhereInput {
+  const where: Prisma.BoilerLogWhereInput = session ? mergeCompanyLogWhere(session) : {};
 
   if (filters.startDate || filters.endDate) {
     where.logDate = {};
@@ -75,14 +80,18 @@ export function parseLogsFilters(searchParams: URLSearchParams): LogsFilterParam
   };
 }
 
-export async function fetchFilteredLogs(filters: LogsFilterParams, forExport = false) {
+export async function fetchFilteredLogs(
+  filters: LogsFilterParams,
+  forExport = false,
+  session?: SessionUser
+) {
   const sortBy = filters.sortBy || "logDate";
   const sortOrder = filters.sortOrder === "asc" ? "asc" : "desc";
   const allowedSort = ["logDate", "status", "shift"];
   const orderField = allowedSort.includes(sortBy) ? sortBy : "logDate";
 
   return prisma.boilerLog.findMany({
-    where: buildLogsWhere(filters),
+    where: buildLogsWhere(filters, session),
     include: {
       boiler: { include: { plant: true } },
       operator: { select: { id: true, username: true } },

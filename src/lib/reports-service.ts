@@ -7,6 +7,9 @@ import {
   type TrendPeriod,
 } from "@/lib/report-metrics";
 import { buildChartLimits, limitsDescription } from "@/lib/operating-limit-bands";
+import type { SessionUser } from "@/lib/session";
+import { companyFilter } from "@/lib/tenant";
+import { mergeCompanyAlertWhere, mergeCompanyLogWhere } from "@/lib/tenant-access";
 
 export type ReportType =
   | "daily"
@@ -21,6 +24,7 @@ export interface ReportQuery {
   period?: TrendPeriod;
   startDate?: string | null;
   endDate?: string | null;
+  session?: SessionUser;
 }
 
 function dateFilter(startDate?: string | null, endDate?: string | null) {
@@ -34,18 +38,22 @@ function dateFilter(startDate?: string | null, endDate?: string | null) {
 }
 
 export async function fetchReportData(query: ReportQuery) {
-  const { type, boilerId, period = "week", startDate, endDate } = query;
+  const { type, boilerId, period = "week", startDate, endDate, session } = query;
   const boilerFilter = boilerId ? { boilerId } : {};
   const rangeFilter = dateFilter(startDate, endDate);
+  const logTenant = session ? mergeCompanyLogWhere(session) : {};
+  const alertTenant = session ? mergeCompanyAlertWhere(session) : {};
+  const boilerTenant = session ? companyFilter(session) : {};
 
   if (type === "open-alerts") {
     const alerts = await prisma.alert.findMany({
       where: {
         status: { in: ["ABIERTA", "EN_REVISION"] },
+        ...alertTenant,
         ...boilerFilter,
         ...(rangeFilter ? { alertDate: rangeFilter } : {}),
       },
-      include: { boiler: true, capturedBy: { select: { username: true } } },
+      include: { boiler: true, capturedBy: { select: { username: true, name: true } } },
       orderBy: { alertDate: "desc" },
     });
     return { type, alerts, total: alerts.length, startDate, endDate };
@@ -55,10 +63,11 @@ export async function fetchReportData(query: ReportQuery) {
     const logs = await prisma.boilerLog.findMany({
       where: {
         status: { in: ["ENVIADO", "REVISADO"] },
+        ...logTenant,
         ...(boilerId ? { boilerId } : {}),
         ...(rangeFilter ? { logDate: rangeFilter } : {}),
       },
-      include: { boiler: true, operator: { select: { username: true } } },
+      include: { boiler: true, operator: { select: { username: true, name: true } } },
       orderBy: { logDate: "desc" },
     });
     return { type, logs, total: logs.length, startDate, endDate };
@@ -68,10 +77,11 @@ export async function fetchReportData(query: ReportQuery) {
     const alerts = await prisma.alert.findMany({
       where: {
         severity: "CRITICO",
+        ...alertTenant,
         ...boilerFilter,
         ...(rangeFilter ? { alertDate: rangeFilter } : {}),
       },
-      include: { boiler: true, capturedBy: { select: { username: true } } },
+      include: { boiler: true, capturedBy: { select: { username: true, name: true } } },
       orderBy: { alertDate: "desc" },
       take: 500,
     });
@@ -83,6 +93,7 @@ export async function fetchReportData(query: ReportQuery) {
 
     const logs = await prisma.boilerLog.findMany({
       where: {
+        ...logTenant,
         ...boilerFilter,
         logDate: { gte: start, lte: end },
         status: { in: ["APROBADO", "REVISADO", "ENVIADO"] },
@@ -93,6 +104,7 @@ export async function fetchReportData(query: ReportQuery) {
 
     const alerts = await prisma.alert.findMany({
       where: {
+        ...alertTenant,
         ...boilerFilter,
         alertDate: { gte: start, lte: end },
       },
@@ -104,7 +116,11 @@ export async function fetchReportData(query: ReportQuery) {
     const incidents = aggregateIncidentsWithBucket(alerts, bucket);
 
     const limitsRows = await prisma.boilerOperatingLimit.findMany({
-      where: boilerId ? { boilerId } : {},
+      where: boilerId
+        ? { boilerId, boiler: boilerTenant }
+        : Object.keys(boilerTenant).length
+          ? { boiler: boilerTenant }
+          : {},
       include: { boiler: { select: { name: true } } },
     });
 
@@ -138,21 +154,21 @@ export async function fetchReportData(query: ReportQuery) {
 
   const [logs, alerts, boilersOperating] = await Promise.all([
     prisma.boilerLog.findMany({
-      where: { logDate: logDateFilter, ...boilerFilter },
+      where: { logDate: logDateFilter, ...logTenant, ...boilerFilter },
       include: {
         boiler: true,
-        operator: { select: { username: true } },
+        operator: { select: { username: true, name: true } },
         combustion: true,
         waterTreatment: true,
       },
       orderBy: { logDate: "desc" },
     }),
     prisma.alert.findMany({
-      where: { alertDate: alertDateFilter, ...boilerFilter },
-      include: { boiler: true, capturedBy: { select: { username: true } } },
+      where: { alertDate: alertDateFilter, ...alertTenant, ...boilerFilter },
+      include: { boiler: true, capturedBy: { select: { username: true, name: true } } },
       orderBy: { alertDate: "desc" },
     }),
-    prisma.boiler.count({ where: { status: "OPERANDO" } }),
+    prisma.boiler.count({ where: { status: "OPERANDO", ...boilerTenant } }),
   ]);
 
   const openAlerts = alerts.filter(

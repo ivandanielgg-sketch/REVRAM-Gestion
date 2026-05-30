@@ -96,7 +96,10 @@ export default function LogDetailPage() {
 
   if (!log) return <LoadingState />;
 
-  const canApprove = session?.role === "ADMINISTRADOR" || session?.role === "SUPERVISOR";
+  const canApprove =
+    session?.role === "SUPER_ADMIN" ||
+    session?.role === "COMPANY_ADMIN" ||
+    session?.role === "SUPERVISOR";
   const isApproved = log.status === "APROBADO";
 
   return (

@@ -30,7 +30,7 @@ function ResetForm() {
       setLoading(false);
       return;
     }
-    router.push("/login");
+    router.push("/login?reset=success");
   }
 
   return (
