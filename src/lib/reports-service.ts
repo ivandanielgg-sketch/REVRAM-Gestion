@@ -6,6 +6,7 @@ import {
   resolveDateRange,
   type TrendPeriod,
 } from "@/lib/report-metrics";
+import { buildChartLimits, limitsDescription } from "@/lib/operating-limit-bands";
 
 export type ReportType =
   | "daily"
@@ -102,6 +103,17 @@ export async function fetchReportData(query: ReportQuery) {
     const trends = aggregateTrendDataWithBucket(logs, bucket);
     const incidents = aggregateIncidentsWithBucket(alerts, bucket);
 
+    const limitsRows = await prisma.boilerOperatingLimit.findMany({
+      where: boilerId ? { boilerId } : {},
+      include: { boiler: { select: { name: true } } },
+    });
+
+    const operatingLimits = buildChartLimits(limitsRows);
+    const limitsLabel = limitsDescription(
+      limitsRows.length,
+      limitsRows.length === 1 ? limitsRows[0].boiler.name : undefined
+    );
+
     return {
       type,
       period,
@@ -109,6 +121,8 @@ export async function fetchReportData(query: ReportQuery) {
       endDate: end.toISOString().slice(0, 10),
       trends,
       incidents,
+      operatingLimits,
+      limitsLabel,
       recordCount: logs.length,
       totalIncidents: alerts.length,
     };
