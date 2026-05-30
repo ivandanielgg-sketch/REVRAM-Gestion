@@ -157,7 +157,7 @@ async function main() {
     });
   }
 
-  const log1 = await prisma.boilerLog.create({
+  await prisma.boilerLog.create({
     data: {
       boilerId: boiler.id,
       operatorId: operator.id,

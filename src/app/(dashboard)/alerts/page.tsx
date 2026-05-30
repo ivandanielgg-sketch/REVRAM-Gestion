@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, LoadingState } from "@/components/ui/Common";
 import { Button } from "@/components/ui/Button";
 import { Label, Select, Textarea } from "@/components/ui/Input";
@@ -21,6 +22,7 @@ interface Alert {
 }
 
 export default function AlertsPage() {
+  const router = useRouter();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
@@ -73,7 +75,7 @@ export default function AlertsPage() {
       }),
     });
     const data = await res.json();
-    if (res.ok) window.location.href = `/maintenance/${data.id}`;
+    if (res.ok) router.push(`/maintenance/${data.id}`);
   }
 
   return (

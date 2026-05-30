@@ -15,13 +15,19 @@ import {
   LogOut,
   Menu,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ComplianceBanner } from "@/components/ui/Common";
 import { useState } from "react";
 import { ROLE_LABELS } from "@/lib/constants";
 
-const navItems = [
+const navItems: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+}[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/boilers", label: "Calderas", icon: Flame },
   { href: "/logs/new", label: "Nueva bitácora", icon: ClipboardList },
@@ -32,6 +38,61 @@ const navItems = [
   { href: "/users", label: "Usuarios", icon: Users, adminOnly: true },
   { href: "/settings", label: "Configuración", icon: Settings, adminOnly: true },
 ];
+
+function NavContent({
+  user,
+  pathname,
+  filteredNav,
+  onNavigate,
+  onLogout,
+}: {
+  user: { username: string; role: string };
+  pathname: string;
+  filteredNav: typeof navItems;
+  onNavigate: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <>
+      <div className="border-b border-slate-700 px-4 py-4">
+        <p className="text-sm font-bold text-white">Bitácora de Calderas</p>
+        <p className="text-xs text-slate-400">{ROLE_LABELS[user.role] ?? user.role}</p>
+      </div>
+      <nav className="flex-1 space-y-1 p-3">
+        {filteredNav.map((item) => {
+          const Icon = item.icon;
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                active
+                  ? "bg-slate-700 text-white"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="border-t border-slate-700 p-3">
+        <p className="mb-2 truncate px-3 text-xs text-slate-400">{user.username}</p>
+        <button
+          onClick={onLogout}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
+        >
+          <LogOut className="h-4 w-4" />
+          Cerrar sesión
+        </button>
+      </div>
+    </>
+  );
+}
 
 export function AppShell({
   children,
@@ -54,53 +115,18 @@ export function AppShell({
     (item) => !item.adminOnly || user.role === "ADMINISTRADOR"
   );
 
-  const NavContent = () => (
-    <>
-      <div className="border-b border-slate-700 px-4 py-4">
-        <p className="text-sm font-bold text-white">Bitácora de Calderas</p>
-        <p className="text-xs text-slate-400">{ROLE_LABELS[user.role] ?? user.role}</p>
-      </div>
-      <nav className="flex-1 space-y-1 p-3">
-        {filteredNav.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                active
-                  ? "bg-slate-700 text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="border-t border-slate-700 p-3">
-        <p className="mb-2 truncate px-3 text-xs text-slate-400">{user.username}</p>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
-        >
-          <LogOut className="h-4 w-4" />
-          Cerrar sesión
-        </button>
-      </div>
-    </>
-  );
-
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ComplianceBanner />
       <div className="flex flex-1">
         <aside className="hidden w-60 flex-shrink-0 flex-col bg-slate-900 lg:flex">
-          <NavContent />
+          <NavContent
+            user={user}
+            pathname={pathname}
+            filteredNav={filteredNav}
+            onNavigate={() => setMobileOpen(false)}
+            onLogout={logout}
+          />
         </aside>
 
         {mobileOpen && (
@@ -112,7 +138,13 @@ export function AppShell({
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <NavContent />
+              <NavContent
+                user={user}
+                pathname={pathname}
+                filteredNav={filteredNav}
+                onNavigate={() => setMobileOpen(false)}
+                onLogout={logout}
+              />
             </aside>
           </div>
         )}
