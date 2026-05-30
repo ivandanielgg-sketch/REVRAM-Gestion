@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: boiler-logbook
+    runtime: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    preDeployCommand: npx prisma migrate deploy && npx prisma db seed
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: boiler-logbook-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: EMAIL_SERVER_HOST
+        sync: false
+      - key: EMAIL_SERVER_USER
+        sync: false
+      - key: EMAIL_SERVER_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+databases:
+  - name: boiler-logbook-db
+    plan: free
+    databaseName: boiler_logbook
+    user: boiler_logbook_user
