@@ -4,11 +4,9 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import pg from "pg";
 import bcrypt from "bcryptjs";
 import { SAFETY_CHECKLIST_ITEMS } from "../src/lib/constants";
+import { getPgPoolConfig } from "../src/lib/db-pool";
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-});
+const pool = new pg.Pool(getPgPoolConfig(process.env.DATABASE_URL!));
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 

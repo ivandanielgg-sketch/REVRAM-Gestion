@@ -47,17 +47,21 @@ Esta guía describe cómo desplegar la Bitácora de Calderas en [Render](https:/
 
 ### 3. Variables de entorno
 
-| Variable              | Valor                                      |
-|-----------------------|--------------------------------------------|
-| `DATABASE_URL`        | Internal Database URL de PostgreSQL        |
-| `JWT_SECRET`          | Cadena aleatoria segura (32+ caracteres)   |
-| `NEXTAUTH_SECRET`     | Otra cadena aleatoria segura               |
-| `APP_URL`             | URL pública del servicio                   |
-| `NODE_ENV`            | `production`                               |
-| `EMAIL_SERVER_HOST`   | SMTP host (opcional)                       |
-| `EMAIL_SERVER_USER`   | SMTP usuario (opcional)                    |
-| `EMAIL_SERVER_PASSWORD`| SMTP contraseña (opcional)                |
-| `EMAIL_FROM`          | Correo remitente (opcional)                |
+| Variable              | Valor                                      | Obligatoria |
+|-----------------------|--------------------------------------------|-------------|
+| `DATABASE_URL`        | **Internal Database URL** de PostgreSQL    | **Sí**      |
+| `JWT_SECRET`          | Cadena aleatoria segura (32+ caracteres)   | **Sí**      |
+| `NEXTAUTH_SECRET`     | Otra cadena aleatoria segura               | **Sí**      |
+| `APP_URL`             | URL pública del servicio                   | **Sí**      |
+| `NODE_ENV`            | `production`                               | **Sí**      |
+| `EMAIL_SERVER_HOST`   | SMTP host (opcional)                       | No          |
+| `EMAIL_SERVER_USER`   | SMTP usuario (opcional)                    | No          |
+| `EMAIL_SERVER_PASSWORD`| SMTP contraseña (opcional)                | No          |
+| `EMAIL_FROM`          | Correo remitente (opcional)                | No          |
+
+> **Crítico:** `DATABASE_URL` debe ser la **Internal Database URL** completa, no el nombre de la base ni la External URL pegada incorrectamente.
+>
+> Formato correcto: `postgresql://usuario:contraseña@dpg-xxxxx-a/nombre_db`
 
 ### 4. Migraciones y seed
 
@@ -80,6 +84,34 @@ npx prisma migrate deploy && npx prisma db seed
 - Configure `APP_URL` correctamente para enlaces de recuperación de contraseña
 - Sin SMTP configurado, los enlaces de reset se imprimen en logs del servidor
 - Revise logs de Render si `preDeployCommand` falla por timeout en seed
+
+## Solución de problemas
+
+### Error: "Verifique la conexión a la base de datos"
+
+1. En Render → **PostgreSQL** → **Connections** → copie **Internal Database URL**
+2. En Render → **Web Service** → **Environment** → pegue en `DATABASE_URL`
+3. Verifique que la URL comience con `postgresql://`
+4. **Redeploy** el servicio
+5. Abra `/api/health` — debe mostrar `"database":"connected"`
+
+### Error en health: `Can't reach database server`
+
+- `DATABASE_URL` está vacía, incompleta o mal copiada
+- La base PostgreSQL está suspendida (plan Free inactivo) — ábrala desde el dashboard
+- El Web Service y PostgreSQL están en regiones distintas — deben estar en la misma región
+
+### Después de conectar la base de datos
+
+En la **Shell** de Render:
+
+```bash
+npx prisma migrate deploy
+npx prisma db seed
+npm run reset-admin
+```
+
+Luego login: `admin` / `cambiar123`
 
 ## Comandos útiles en shell de Render
 
