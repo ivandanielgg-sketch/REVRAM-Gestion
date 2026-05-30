@@ -23,7 +23,17 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
+        credentials: "same-origin",
       });
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        setError(
+          "No se pudo conectar con el servidor. Verifique que la aplicación y la base de datos estén en ejecución."
+        );
+        return;
+      }
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Error al iniciar sesión");
@@ -36,7 +46,9 @@ export default function LoginPage() {
       }
       router.refresh();
     } catch {
-      setError("Error de conexión");
+      setError(
+        "Error de conexión. Verifique que el servidor esté activo y DATABASE_URL configurada."
+      );
     } finally {
       setLoading(false);
     }

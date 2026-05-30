@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma";
 import {
   createSessionToken,
   verifyPassword,
-  setSessionCookie,
+  attachSessionCookie,
+  getSessionCookieOptions,
+  SESSION_COOKIE,
 } from "@/lib/auth";
 import { loginSchema } from "@/lib/validations/schemas";
 
@@ -39,9 +41,7 @@ export async function POST(request: NextRequest) {
       mustChangePassword: user.mustChangePassword,
     });
 
-    await setSessionCookie(token);
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: user.id,
         username: user.username,
@@ -50,13 +50,20 @@ export async function POST(request: NextRequest) {
         mustChangePassword: user.mustChangePassword,
       },
     });
-  } catch {
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+
+    return attachSessionCookie(response, token);
+  } catch (error) {
+    console.error("[auth/login]", error);
+    const message =
+      error instanceof Error && error.message.includes("DATABASE_URL")
+        ? "Base de datos no configurada. Contacte al administrador."
+        : "Error interno del servidor. Verifique la conexión a la base de datos.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function DELETE() {
-  const { clearSessionCookie } = await import("@/lib/auth");
-  await clearSessionCookie();
-  return NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true });
+  response.cookies.set(SESSION_COOKIE, "", { ...getSessionCookieOptions(), maxAge: 0 });
+  return response;
 }

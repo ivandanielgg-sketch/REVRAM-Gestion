@@ -26,9 +26,9 @@ Inspirado en prácticas comunes de bitácoras de cuarto de calderas y mantenimie
 # Clonar e instalar dependencias
 npm install
 
-# Configurar variables de entorno
+# Configurar variables de entorno (OBLIGATORIO)
 cp .env.example .env
-# Editar DATABASE_URL y JWT_SECRET
+# Editar DATABASE_URL y JWT_SECRET en .env
 
 # Crear base de datos PostgreSQL
 createdb boiler_logbook
@@ -40,6 +40,8 @@ npx prisma db seed
 # Iniciar en desarrollo
 npm run dev
 ```
+
+> **Importante:** Sin el archivo `.env` con `DATABASE_URL` configurada, el login mostrará error de conexión.
 
 Abrir [http://localhost:3000](http://localhost:3000)
 
