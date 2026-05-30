@@ -3,14 +3,12 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import pg from "pg";
 import bcrypt from "bcryptjs";
+import { getPgPoolConfig } from "../src/lib/db-pool";
 
 const DEFAULT_PASSWORD = "cambiar123";
 
 async function main() {
-  const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-  });
+  const pool = new pg.Pool(getPgPoolConfig(process.env.DATABASE_URL!));
   const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
   const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);

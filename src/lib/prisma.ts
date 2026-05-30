@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import pg from "pg";
+import { getPgPoolConfig } from "@/lib/db-pool";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
@@ -12,15 +13,7 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  const pool = new pg.Pool({
-    connectionString,
-    ssl:
-      process.env.NODE_ENV === "production"
-        ? { rejectUnauthorized: false }
-        : undefined,
-    max: 10,
-    connectionTimeoutMillis: 10000,
-  });
+  const pool = new pg.Pool(getPgPoolConfig(connectionString));
 
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
