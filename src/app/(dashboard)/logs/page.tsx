@@ -51,8 +51,9 @@ export default function LogsHistoryPage() {
     loadLogs();
   }, []);
 
-  function exportCsv() {
+  function exportLogs(format: "csv" | "xlsx" | "pdf") {
     const params = new URLSearchParams(filters as Record<string, string>);
+    params.set("format", format);
     window.open(`/api/logs/export?${params}`, "_blank");
   }
 
@@ -62,9 +63,15 @@ export default function LogsHistoryPage() {
         title="Historial de bitácoras"
         description="Consulta y filtrado de registros históricos"
         action={
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={exportCsv}>
-              Exportar CSV
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => exportLogs("xlsx")} disabled={loading || logs.length === 0}>
+              Excel
+            </Button>
+            <Button variant="secondary" onClick={() => exportLogs("pdf")} disabled={loading || logs.length === 0}>
+              PDF
+            </Button>
+            <Button variant="secondary" onClick={() => exportLogs("csv")} disabled={loading || logs.length === 0}>
+              CSV
             </Button>
             <Link href="/logs/new">
               <Button>Nueva bitácora</Button>
