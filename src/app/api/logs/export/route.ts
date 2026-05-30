@@ -1,56 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/api-auth";
+import { parseLogsFilters, fetchFilteredLogs } from "@/lib/logs-query";
+import { generateLogsExport } from "@/lib/logs-export";
+import type { ExportFormat } from "@/lib/export-utils";
+
+export const runtime = "nodejs";
+
+const VALID_FORMATS: ExportFormat[] = ["csv", "xlsx", "pdf"];
 
 export async function GET(request: NextRequest) {
   const { error } = await requirePermission(request, "logs.export");
   if (error) return error;
 
-  const url = new URL(request.url);
-  const logsUrl = `${url.origin}/api/logs?${url.searchParams.toString()}`;
-  const res = await fetch(logsUrl, {
-    headers: { cookie: request.headers.get("cookie") || "" },
-  });
-  const logs = await res.json();
+  const { searchParams } = new URL(request.url);
+  const formatParam = searchParams.get("format") || "csv";
+  if (!VALID_FORMATS.includes(formatParam as ExportFormat)) {
+    return NextResponse.json(
+      { error: "Formato inválido. Use csv, xlsx o pdf." },
+      { status: 400 }
+    );
+  }
+  const format = formatParam as ExportFormat;
 
-  const headers = [
-    "Fecha",
-    "Caldera",
-    "Operador",
-    "Turno",
-    "Estado",
-    "Presión vapor",
-    "Nivel agua",
-    "Estado registro",
-  ];
+  try {
+    const filters = parseLogsFilters(searchParams);
+    const logs = await fetchFilteredLogs(filters, true);
+    const { buffer, contentType, filename } = generateLogsExport(logs, format, {
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+    });
 
-  const rows = logs.map(
-    (l: {
-      logDate: string;
-      boiler: { name: string };
-      operator: { username: string };
-      shift: string;
-      operationalState: string;
-      steamPressure: number | null;
-      waterLevel: number | null;
-      status: string;
-    }) =>
-      [
-        l.logDate,
-        l.boiler.name,
-        l.operator.username,
-        l.shift,
-        l.operationalState,
-        l.steamPressure ?? "",
-        l.waterLevel ?? "",
-        l.status,
-      ].join(",")
-  );
+    const body = typeof buffer === "string" ? buffer : new Uint8Array(buffer);
 
-  const csv = [headers.join(","), ...rows].join("\n");
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="bitacoras.csv"',
-    },
-  });
+    return new NextResponse(body, {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al exportar bitácoras";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

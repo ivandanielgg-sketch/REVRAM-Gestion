@@ -6,65 +6,14 @@ import { boilerLogSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
 import { SAFETY_CHECKLIST_ITEMS } from "@/lib/constants";
-import { Prisma } from "@/generated/prisma/client";
+import { parseLogsFilters, fetchFilteredLogs } from "@/lib/logs-query";
 
 export async function GET(request: NextRequest) {
   const { error } = await requirePermission(request, "logs.view");
   if (error) return error;
 
-  const { searchParams } = new URL(request.url);
-  const startDate = searchParams.get("startDate");
-  const endDate = searchParams.get("endDate");
-  const boilerId = searchParams.get("boilerId");
-  const operatorId = searchParams.get("operatorId");
-  const shift = searchParams.get("shift");
-  const status = searchParams.get("status");
-  const requiresMaintenance = searchParams.get("requiresMaintenance");
-  const plantId = searchParams.get("plantId");
-  const fuelType = searchParams.get("fuelType");
-  const boilerType = searchParams.get("boilerType");
-  const search = searchParams.get("search");
-  const sortBy = searchParams.get("sortBy") || "logDate";
-  const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
-
-  const where: Prisma.BoilerLogWhereInput = {};
-
-  if (startDate || endDate) {
-    where.logDate = {};
-    if (startDate) where.logDate.gte = new Date(startDate);
-    if (endDate) where.logDate.lte = new Date(endDate);
-  }
-  if (boilerId) where.boilerId = boilerId;
-  if (operatorId) where.operatorId = operatorId;
-  if (shift) where.shift = shift as Prisma.EnumShiftTypeFilter["equals"];
-  if (status) where.status = status as Prisma.EnumLogStatusFilter["equals"];
-  if (requiresMaintenance === "true") where.requiresMaintenance = true;
-  if (search) {
-    where.OR = [
-      { generalObservations: { contains: search, mode: "insensitive" } },
-      { abnormalCondition: { contains: search, mode: "insensitive" } },
-    ];
-  }
-  if (plantId || fuelType || boilerType) {
-    where.boiler = {};
-    if (plantId) where.boiler.plantId = plantId;
-    if (fuelType) where.boiler.fuelType = fuelType as Prisma.EnumFuelTypeFilter["equals"];
-    if (boilerType) where.boiler.type = boilerType as Prisma.EnumBoilerTypeFilter["equals"];
-  }
-
-  const logs = await prisma.boilerLog.findMany({
-    where,
-    include: {
-      boiler: { include: { plant: true } },
-      operator: { select: { id: true, username: true } },
-      combustion: true,
-      waterTreatment: true,
-      alerts: true,
-      _count: { select: { safetyChecklist: true } },
-    },
-    orderBy: { [sortBy]: sortOrder },
-    take: 500,
-  });
+  const filters = parseLogsFilters(new URL(request.url).searchParams);
+  const logs = await fetchFilteredLogs(filters);
 
   return NextResponse.json(logs);
 }
