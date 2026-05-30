@@ -65,10 +65,17 @@ Esta guía describe cómo desplegar la Bitácora de Calderas en [Render](https:/
 
 ### 4. Migraciones y seed
 
-En el primer despliegue, ejecute desde la shell de Render o como **Pre-Deploy Command**:
+En el primer despliegue, ejecute desde la **Shell** de Render (solo una vez):
 
 ```bash
-npx prisma migrate deploy && npx prisma db seed
+npx prisma migrate deploy
+npx prisma db seed
+```
+
+El **Pre-Deploy Command** del servicio debe ser únicamente:
+
+```bash
+npx prisma migrate deploy
 ```
 
 ### 5. Verificar
@@ -83,7 +90,13 @@ npx prisma migrate deploy && npx prisma db seed
 - Use plan PostgreSQL con persistencia (Free tier puede reiniciarse)
 - Configure `APP_URL` correctamente para enlaces de recuperación de contraseña
 - Sin SMTP configurado, los enlaces de reset se imprimen en logs del servidor
-- Revise logs de Render si `preDeployCommand` falla por timeout en seed
+- Revise logs de Render si `preDeployCommand` falla por timeout en migraciones
+
+### Error en pre-deploy: `Unique constraint failed on orderNumber`
+
+- Ocurre si el seed se ejecutaba en cada deploy y los datos demo ya existían.
+- Solución: Pre-Deploy debe ser solo `npx prisma migrate deploy` (sin seed).
+- Seed manual una sola vez: `npx prisma db seed` en la Shell de Render.
 
 ## Solución de problemas
 
