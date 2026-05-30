@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader, LoadingState, EmptyState } from "@/components/ui/Common";
 import { Card, StatCard } from "@/components/ui/Card";
-import { Select, Label } from "@/components/ui/Input";
+import { Select, Label, Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import {
   LineChart,
@@ -76,6 +76,8 @@ interface DailyAlert {
 interface TrendsReport {
   type: "trends";
   period: TrendPeriod;
+  startDate?: string;
+  endDate?: string;
   trends: Record<string, string | number>[];
   recordCount: number;
 }
@@ -235,12 +237,12 @@ function TrendsView({ data }: { data: TrendsReport }) {
   );
 }
 
-function DailyView({ data }: { data: DailyReport }) {
+function DailyView({ data, hasRange }: { data: DailyReport; hasRange: boolean }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Bitácoras hoy" value={data.summary.logsToday} />
-        <StatCard label="Alertas hoy" value={data.summary.alertsToday} accent="warning" />
+        <StatCard label={hasRange ? "Bitácoras" : "Bitácoras hoy"} value={data.summary.logsToday} />
+        <StatCard label={hasRange ? "Alertas" : "Alertas hoy"} value={data.summary.alertsToday} accent="warning" />
         <StatCard label="Alertas abiertas" value={data.summary.openAlerts} accent="warning" />
         <StatCard
           label="Alertas críticas"
@@ -250,7 +252,7 @@ function DailyView({ data }: { data: DailyReport }) {
         <StatCard label="Calderas operando" value={data.summary.boilersOperating} />
       </div>
 
-      <Card title="Bitácoras del día">
+      <Card title={hasRange ? "Bitácoras del periodo" : "Bitácoras del día"}>
         <DataTable
           headers={["Fecha", "Caldera", "Turno", "Presión", "Temp.", "Nivel", "Operador", "Estado"]}
           rows={data.logs.map((l) => [
@@ -266,7 +268,7 @@ function DailyView({ data }: { data: DailyReport }) {
         />
       </Card>
 
-      <Card title="Alertas del día">
+      <Card title={hasRange ? "Alertas del periodo" : "Alertas del día"}>
         <DataTable
           headers={["Fecha", "Caldera", "Parámetro", "Valor", "Severidad", "Estado", "Capturada por"]}
           rows={data.alerts.map((a) => [
@@ -327,10 +329,32 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>("daily");
   const [period, setPeriod] = useState<TrendPeriod>("week");
   const [boilerId, setBoilerId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [boilers, setBoilers] = useState<BoilerOption[]>([]);
   const [data, setData] = useState<ReportData>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const hasDateRange = Boolean(startDate || endDate);
+  const effectivePeriod: TrendPeriod =
+    reportType === "trends" && hasDateRange ? "custom" : period;
+
+  function buildParams(forExport = false): URLSearchParams {
+    const params = new URLSearchParams({ type: reportType });
+    if (boilerId) params.set("boilerId", boilerId);
+    if (reportType === "trends") params.set("period", effectivePeriod);
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    if (forExport) return params;
+    return params;
+  }
+
+  function exportReport(format: "csv" | "xlsx" | "pdf") {
+    const params = buildParams(true);
+    params.set("format", format);
+    window.open(`/api/reports/export?${params}`, "_blank");
+  }
 
   useEffect(() => {
     fetch("/api/boilers")
@@ -342,9 +366,7 @@ export default function ReportsPage() {
   const loadReport = useCallback(() => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ type: reportType });
-    if (boilerId) params.set("boilerId", boilerId);
-    if (reportType === "trends") params.set("period", period);
+    const params = buildParams();
 
     fetch(`/api/reports?${params}`)
       .then(async (r) => {
@@ -357,7 +379,7 @@ export default function ReportsPage() {
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [reportType, boilerId, period]);
+  }, [reportType, boilerId, period, startDate, endDate, effectivePeriod]);
 
   useEffect(() => {
     loadReport();
@@ -366,7 +388,7 @@ export default function ReportsPage() {
   function renderReport() {
     if (!data) return null;
 
-    if (data.type === "daily") return <DailyView data={data} />;
+    if (data.type === "daily") return <DailyView data={data} hasRange={hasDateRange} />;
 
     if (data.type === "trends") return <TrendsView data={data} />;
 
@@ -412,18 +434,38 @@ export default function ReportsPage() {
           </Select>
         </div>
 
-        {reportType === "trends" && (
+        {reportType === "trends" && !hasDateRange && (
           <div>
             <Label>Periodo</Label>
             <Select value={period} onChange={(e) => setPeriod(e.target.value as TrendPeriod)}>
-              {Object.entries(PERIOD_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
+              {Object.entries(PERIOD_LABELS)
+                .filter(([key]) => key !== "custom")
+                .map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
             </Select>
           </div>
         )}
+
+        <div>
+          <Label>Desde</Label>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label>Hasta</Label>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
 
         <div>
           <Label>Caldera</Label>
@@ -437,12 +479,28 @@ export default function ReportsPage() {
           </Select>
         </div>
 
-        <div className="flex items-end">
+        <div className="flex flex-wrap items-end gap-2">
           <Button onClick={loadReport} disabled={loading}>
             {loading ? "Generando..." : "Generar"}
           </Button>
+          <Button variant="secondary" onClick={() => exportReport("xlsx")} disabled={loading || !data}>
+            Excel
+          </Button>
+          <Button variant="secondary" onClick={() => exportReport("pdf")} disabled={loading || !data}>
+            PDF
+          </Button>
+          <Button variant="secondary" onClick={() => exportReport("csv")} disabled={loading || !data}>
+            CSV
+          </Button>
         </div>
       </div>
+
+      {hasDateRange && (
+        <p className="mb-4 text-sm text-slate-600">
+          Filtrando por rango: {startDate || "inicio"} — {endDate || "hoy"}
+          {reportType === "trends" && " (periodo personalizado en gráficas)"}
+        </p>
+      )}
 
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
