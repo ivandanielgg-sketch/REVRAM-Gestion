@@ -2,9 +2,9 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import pg from "pg";
-import bcrypt from "bcryptjs";
 import { SAFETY_CHECKLIST_ITEMS } from "../src/lib/constants";
 import { getPgPoolConfig } from "../src/lib/db-pool";
+import { ensureDefaultUsers } from "./ensure-default-users";
 
 const pool = new pg.Pool(getPgPoolConfig(process.env.DATABASE_URL!));
 const adapter = new PrismaPg(pool);
@@ -13,70 +13,11 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log("Seeding database...");
 
-  const passwordHash = await bcrypt.hash("cambiar123", 12);
+  await ensureDefaultUsers(prisma);
 
-  const admin = await prisma.user.upsert({
-    where: { username: "admin" },
-    update: {
-      isActive: true,
-    },
-    create: {
-      username: "admin",
-      email: "admin@example.com",
-      passwordHash,
-      role: "ADMINISTRADOR",
-      mustChangePassword: true,
-      isActive: true,
-    },
-  });
-
-  const supervisor = await prisma.user.upsert({
-    where: { username: "supervisor" },
-    update: {},
-    create: {
-      username: "supervisor",
-      email: "supervisor@example.com",
-      passwordHash: await bcrypt.hash("supervisor123", 12),
-      role: "SUPERVISOR",
-      isActive: true,
-    },
-  });
-
-  const operator = await prisma.user.upsert({
-    where: { username: "operador" },
-    update: {},
-    create: {
-      username: "operador",
-      email: "operador@example.com",
-      passwordHash: await bcrypt.hash("operador123", 12),
-      role: "OPERADOR",
-      isActive: true,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { username: "mantenimiento" },
-    update: {},
-    create: {
-      username: "mantenimiento",
-      email: "mantenimiento@example.com",
-      passwordHash: await bcrypt.hash("mantenimiento123", 12),
-      role: "MANTENIMIENTO",
-      isActive: true,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { username: "consulta" },
-    update: {},
-    create: {
-      username: "consulta",
-      email: "consulta@example.com",
-      passwordHash: await bcrypt.hash("consulta123", 12),
-      role: "SOLO_CONSULTA",
-      isActive: true,
-    },
-  });
+  const admin = await prisma.user.findUniqueOrThrow({ where: { username: "admin" } });
+  const supervisor = await prisma.user.findUniqueOrThrow({ where: { username: "supervisor" } });
+  const operator = await prisma.user.findUniqueOrThrow({ where: { username: "operador" } });
 
   const plant = await prisma.plant.upsert({
     where: { id: "demo-plant-001" },

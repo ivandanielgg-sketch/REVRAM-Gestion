@@ -39,6 +39,10 @@ export const TREND_GROUP_LABELS: Record<TrendMetric["group"], string> = {
   operacion: "Operación",
 };
 
+export const STANDARD_BOILER_METRICS: TrendMetric[] = TREND_METRICS.filter((m) =>
+  ["steamPressure", "steamTemperature", "waterLevel", "flueGasTemperature", "ph", "conductivity"].includes(m.key)
+);
+
 export const PERIOD_LABELS: Record<TrendPeriod, string> = {
   day: "Día (hoy)",
   week: "Semana (7 días)",
@@ -230,4 +234,44 @@ export function aggregateTrendDataWithBucket(
       point.count = maxCount;
       return point;
     });
+}
+
+export interface IncidentPoint {
+  label: string;
+  total: number;
+  critico: number;
+  advertencia: number;
+  informativo: number;
+}
+
+interface AlertRow {
+  alertDate: Date | string;
+  severity: string;
+}
+
+export function aggregateIncidentsWithBucket(
+  alerts: AlertRow[],
+  bucket: "hour" | "day" | "month"
+): IncidentPoint[] {
+  const buckets = new Map<string, { critico: number; advertencia: number; informativo: number }>();
+
+  for (const alert of alerts) {
+    const date = typeof alert.alertDate === "string" ? new Date(alert.alertDate) : alert.alertDate;
+    const key = bucketKey(date, bucket);
+    if (!buckets.has(key)) {
+      buckets.set(key, { critico: 0, advertencia: 0, informativo: 0 });
+    }
+    const entry = buckets.get(key)!;
+    if (alert.severity === "CRITICO") entry.critico += 1;
+    else if (alert.severity === "ADVERTENCIA") entry.advertencia += 1;
+    else entry.informativo += 1;
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, counts]) => ({
+      label: bucketLabel(key, bucket),
+      total: counts.critico + counts.advertencia + counts.informativo,
+      ...counts,
+    }));
 }

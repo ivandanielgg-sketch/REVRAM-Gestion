@@ -92,6 +92,21 @@ function buildSheets(data: Record<string, unknown>): ExportSheet[] {
         t.count as number,
       ]),
     });
+
+    const incidents = (data.incidents as Array<Record<string, number | string>>) || [];
+    if (incidents.length > 0) {
+      sheets.push({
+        name: "Incidencias",
+        headers: ["Periodo", "Total", "Crítico", "Advertencia", "Informativo"],
+        rows: incidents.map((i) => [
+          i.label as string,
+          i.total as number,
+          i.critico as number,
+          i.advertencia as number,
+          i.informativo as number,
+        ]),
+      });
+    }
   }
 
   if (data.alerts && type !== "daily") {

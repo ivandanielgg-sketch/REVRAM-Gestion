@@ -72,11 +72,13 @@ npx prisma migrate deploy
 npx prisma db seed
 ```
 
-El **Pre-Deploy Command** del servicio debe ser únicamente:
+El **Pre-Deploy Command** del servicio debe ser:
 
 ```bash
-npx prisma migrate deploy
+npx prisma migrate deploy && npm run ensure-users
 ```
+
+Esto garantiza usuarios base en cada deploy **sin borrar datos** ni duplicar bitácoras demo. Los datos de PostgreSQL persisten entre deploys; solo se verifican los 5 usuarios iniciales.
 
 ### 5. Verificar
 
