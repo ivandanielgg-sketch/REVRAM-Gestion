@@ -4,13 +4,15 @@ import { requirePermission } from "@/lib/api-auth";
 import { boilerSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
+import { companyFilter } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "boilers.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "boilers.view");
+  if (error || !session) return error;
 
   const boilers = await prisma.boiler.findMany({
-    include: { plant: true, operatingLimits: true },
+    where: companyFilter(session),
+    include: { plant: true, operatingLimits: true, company: true },
     orderBy: { name: "asc" },
   });
   return NextResponse.json(boilers);
@@ -26,15 +28,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
+  const companyId = session.companyId;
+  if (!companyId && session.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Empresa no asignada" }, { status: 400 });
+  }
+
+  const targetCompanyId = parsed.data.companyId || companyId;
+  if (!targetCompanyId) {
+    return NextResponse.json({ error: "Empresa requerida" }, { status: 400 });
+  }
+
   const data = parsed.data;
   const boiler = await prisma.boiler.create({
     data: {
       ...data,
+      companyId: targetCompanyId,
       installationDate: data.installationDate ? new Date(data.installationDate) : null,
       lastInspectionDate: data.lastInspectionDate ? new Date(data.lastInspectionDate) : null,
       nextInspectionDate: data.nextInspectionDate ? new Date(data.nextInspectionDate) : null,
     },
-    include: { plant: true },
+    include: { plant: true, company: true },
   });
 
   await createAuditLog({

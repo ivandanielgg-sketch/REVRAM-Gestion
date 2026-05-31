@@ -5,15 +5,16 @@ import { PageHeader, LoadingState } from "@/components/ui/Common";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Card";
-import { ROLE_LABELS } from "@/lib/constants";
+import { ROLE_LABELS, USER_STATUS_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 
 interface User {
   id: string;
   username: string;
+  name: string;
   email: string;
   role: string;
-  isActive: boolean;
+  status: string;
   lastLoginAt: string | null;
 }
 
@@ -41,17 +42,17 @@ export default function UsersPage() {
     await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(fd.entries())),
+      body: JSON.stringify({ ...Object.fromEntries(fd.entries()), status: "ACTIVE" }),
     });
     setShowForm(false);
     load();
   }
 
-  async function toggleActive(user: User) {
+  async function toggleStatus(user: User) {
     await fetch(`/api/users/${user.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: !user.isActive }),
+      body: JSON.stringify({ status: user.status === "ACTIVE" ? "DISABLED" : "ACTIVE" }),
     });
     load();
   }
@@ -61,8 +62,8 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="Usuarios"
-        description="Administración de usuarios y roles"
+        title="Usuarios de empresa"
+        description="Administración de usuarios de su organización"
         action={<Button onClick={() => setShowForm(!showForm)}>Nuevo usuario</Button>}
       />
 
@@ -74,6 +75,10 @@ export default function UsersPage() {
               <Input name="username" required />
             </div>
             <div>
+              <Label>Nombre</Label>
+              <Input name="name" required />
+            </div>
+            <div>
               <Label>Correo</Label>
               <Input name="email" type="email" required />
             </div>
@@ -83,14 +88,20 @@ export default function UsersPage() {
             </div>
             <div>
               <Label>Rol</Label>
-              <Select name="role" defaultValue="OPERADOR">
-                {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
+              <Select name="role" defaultValue="OPERATOR">
+                {Object.entries(ROLE_LABELS)
+                  .filter(([k]) => k !== "SUPER_ADMIN")
+                  .map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
               </Select>
             </div>
           </div>
-          <Button type="submit" className="mt-4">Crear</Button>
+          <Button type="submit" className="mt-4">
+            Crear
+          </Button>
         </form>
       )}
 
@@ -109,18 +120,26 @@ export default function UsersPage() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-t border-slate-100">
-                <td className="px-4 py-3 font-medium">{u.username}</td>
+                <td className="px-4 py-3 font-medium">{u.name || u.username}</td>
                 <td className="px-4 py-3">{u.email}</td>
                 <td className="px-4 py-3">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-3">
-                  <Badge className={u.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                    {u.isActive ? "Activo" : "Inactivo"}
+                  <Badge
+                    className={
+                      u.status === "ACTIVE"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }
+                  >
+                    {USER_STATUS_LABELS[u.status] || u.status}
                   </Badge>
                 </td>
-                <td className="px-4 py-3">{u.lastLoginAt ? formatDate(u.lastLoginAt, true) : "—"}</td>
                 <td className="px-4 py-3">
-                  <Button size="sm" variant="secondary" onClick={() => toggleActive(u)}>
-                    {u.isActive ? "Desactivar" : "Activar"}
+                  {u.lastLoginAt ? formatDate(u.lastLoginAt, true) : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  <Button size="sm" variant="secondary" onClick={() => toggleStatus(u)}>
+                    {u.status === "ACTIVE" ? "Deshabilitar" : "Activar"}
                   </Button>
                 </td>
               </tr>

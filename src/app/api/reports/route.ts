@@ -14,8 +14,8 @@ const VALID_TYPES: ReportType[] = [
 const VALID_PERIODS: TrendPeriod[] = ["day", "week", "month", "year", "custom"];
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "reports.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "reports.view");
+  if (error || !session) return error;
 
   const { searchParams } = new URL(request.url);
   const typeParam = searchParams.get("type") || "daily";
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     period,
     startDate: searchParams.get("startDate"),
     endDate: searchParams.get("endDate"),
+    session,
   });
 
   return NextResponse.json(data);

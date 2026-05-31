@@ -1,22 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/api-auth";
+import { requireAnyPermission } from "@/lib/api-auth";
 import { userSchema } from "@/lib/validations/schemas";
 import { hashPassword } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
+import { companyFilter, isSuperAdmin } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "users.manage");
-  if (error) return error;
+  const { error, session } = await requireAnyPermission(request, [
+    "users.manage",
+    "users.manage_company",
+  ]);
+  if (error || !session) return error;
+
+  const where = isSuperAdmin(session.role)
+    ? { deletedAt: null }
+    : { ...companyFilter(session), deletedAt: null };
 
   const users = await prisma.user.findMany({
+    where,
     select: {
       id: true,
       username: true,
       email: true,
+      name: true,
       role: true,
-      isActive: true,
+      status: true,
+      companyId: true,
+      company: { select: { name: true } },
       mustChangePassword: true,
       lastLoginAt: true,
       createdAt: true,
@@ -27,7 +39,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { error, session } = await requirePermission(request, "users.manage");
+  const { error, session } = await requireAnyPermission(request, [
+    "users.manage",
+    "users.manage_company",
+  ]);
   if (error || !session) return error;
 
   const body = await request.json();
@@ -40,21 +55,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
   }
 
+  const companyId = parsed.data.companyId || session.companyId;
+  if (!companyId && !isSuperAdmin(session.role)) {
+    return NextResponse.json({ error: "Empresa requerida" }, { status: 400 });
+  }
+
   const passwordHash = await hashPassword(parsed.data.password);
   const user = await prisma.user.create({
     data: {
       username: parsed.data.username,
       email: parsed.data.email,
+      name: parsed.data.name || parsed.data.username,
       passwordHash,
       role: parsed.data.role,
-      isActive: parsed.data.isActive,
+      status: parsed.data.status || "ACTIVE",
+      companyId,
     },
     select: {
       id: true,
       username: true,
       email: true,
+      name: true,
       role: true,
-      isActive: true,
+      status: true,
+      companyId: true,
     },
   });
 

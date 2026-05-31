@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import { companyFilter } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "boilers.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "boilers.view");
+  if (error || !session) return error;
 
+  const companyWhere = companyFilter(session);
   const plants = await prisma.plant.findMany({
+    where: Object.keys(companyWhere).length ? companyWhere : undefined,
     include: { _count: { select: { boilers: true } } },
     orderBy: { name: "asc" },
   });
@@ -14,10 +17,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requirePermission(request, "settings.manage");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "settings.manage");
+  if (error || !session) return error;
 
   const body = await request.json();
-  const plant = await prisma.plant.create({ data: body });
+  const plant = await prisma.plant.create({
+    data: {
+      ...body,
+      companyId: body.companyId || session.companyId,
+    },
+  });
   return NextResponse.json(plant, { status: 201 });
 }

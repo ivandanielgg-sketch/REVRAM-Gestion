@@ -6,16 +6,17 @@ import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
 import { generateOrderNumber } from "@/lib/utils";
 import { Prisma } from "@/generated/prisma/client";
+import { getBoilerForSession, mergeCompanyMaintenanceWhere } from "@/lib/tenant-access";
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "maintenance.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "maintenance.view");
+  if (error || !session) return error;
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const boilerId = searchParams.get("boilerId");
 
-  const where: Prisma.MaintenanceOrderWhereInput = {};
+  const where: Prisma.MaintenanceOrderWhereInput = { ...mergeCompanyMaintenanceWhere(session) };
   if (status) where.status = status as Prisma.EnumMaintenanceStatusFilter["equals"];
   if (boilerId) where.boilerId = boilerId;
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     where,
     include: {
       boiler: { select: { id: true, name: true } },
-      responsible: { select: { id: true, username: true } },
+      responsible: { select: { id: true, username: true, name: true } },
       alert: { select: { id: true, parameter: true, severity: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -40,6 +41,11 @@ export async function POST(request: NextRequest) {
   const parsed = maintenanceSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+  }
+
+  const boiler = await getBoilerForSession(parsed.data.boilerId, session);
+  if (!boiler) {
+    return NextResponse.json({ error: "Caldera no encontrada o sin acceso" }, { status: 403 });
   }
 
   const data = parsed.data;

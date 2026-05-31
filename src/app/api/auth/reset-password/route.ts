@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, verifyTokenHash } from "@/lib/auth";
 import { resetPasswordSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 
@@ -11,12 +11,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const resetToken = await prisma.passwordResetToken.findUnique({
-    where: { token: parsed.data.token },
+  const tokens = await prisma.passwordResetToken.findMany({
+    where: {
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+    },
     include: { user: true },
+    orderBy: { createdAt: "desc" },
+    take: 50,
   });
 
-  if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+  const resetToken = await (async () => {
+    for (const candidate of tokens) {
+      if (await verifyTokenHash(parsed.data.token, candidate.tokenHash)) {
+        return candidate;
+      }
+    }
+    return null;
+  })();
+
+  if (!resetToken) {
     return NextResponse.json({ error: "Token inválido o expirado" }, { status: 400 });
   }
 
@@ -24,11 +38,11 @@ export async function POST(request: NextRequest) {
   await prisma.$transaction([
     prisma.user.update({
       where: { id: resetToken.userId },
-      data: { passwordHash, mustChangePassword: false },
+      data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
     }),
     prisma.passwordResetToken.update({
       where: { id: resetToken.id },
-      data: { used: true },
+      data: { usedAt: new Date() },
     }),
   ]);
 
@@ -39,5 +53,8 @@ export async function POST(request: NextRequest) {
     recordId: resetToken.userId,
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    message: "Contraseña actualizada correctamente. Ya puedes iniciar sesión.",
+  });
 }

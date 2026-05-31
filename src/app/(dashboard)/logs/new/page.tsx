@@ -38,7 +38,7 @@ export default function NewLogPage() {
       fetch("/api/auth/me").then((r) => r.json()),
     ]).then(([b, u, s]) => {
       setBoilers(b);
-      setOperators(u.filter((x: { role: string }) => ["OPERADOR", "SUPERVISOR", "ADMINISTRADOR"].includes(x.role)));
+      setOperators(u.filter((x: { role: string }) => ["OPERATOR", "SUPERVISOR", "COMPANY_ADMIN", "SUPER_ADMIN"].includes(x.role)));
       setSession(s.user);
     });
   }, []);

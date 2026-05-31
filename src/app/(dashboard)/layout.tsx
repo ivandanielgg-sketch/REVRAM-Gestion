@@ -10,7 +10,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (session.mustChangePassword) redirect("/change-password");
 
   return (
-    <AppShell user={{ username: session.username, role: session.role }}>
+    <AppShell
+      user={{
+        username: session.username,
+        name: session.name,
+        role: session.role,
+        companyName: session.companyName,
+      }}
+    >
       {children}
     </AppShell>
   );

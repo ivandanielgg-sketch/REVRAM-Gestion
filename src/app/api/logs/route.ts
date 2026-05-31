@@ -7,13 +7,14 @@ import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
 import { SAFETY_CHECKLIST_ITEMS } from "@/lib/constants";
 import { parseLogsFilters, fetchFilteredLogs } from "@/lib/logs-query";
+import { getBoilerForSession } from "@/lib/tenant-access";
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "logs.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "logs.view");
+  if (error || !session) return error;
 
   const filters = parseLogsFilters(new URL(request.url).searchParams);
-  const logs = await fetchFilteredLogs(filters);
+  const logs = await fetchFilteredLogs(filters, false, session);
 
   return NextResponse.json(logs);
 }
@@ -26,6 +27,11 @@ export async function POST(request: NextRequest) {
   const parsed = boilerLogSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+  }
+
+  const boiler = await getBoilerForSession(parsed.data.boilerId, session);
+  if (!boiler) {
+    return NextResponse.json({ error: "Caldera no encontrada o sin acceso" }, { status: 403 });
   }
 
   const data = parsed.data;

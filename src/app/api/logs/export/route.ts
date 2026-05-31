@@ -9,8 +9,8 @@ export const runtime = "nodejs";
 const VALID_FORMATS: ExportFormat[] = ["csv", "xlsx", "pdf"];
 
 export async function GET(request: NextRequest) {
-  const { error } = await requirePermission(request, "logs.export");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "logs.export");
+  if (error || !session) return error;
 
   const { searchParams } = new URL(request.url);
   const formatParam = searchParams.get("format") || "csv";
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const filters = parseLogsFilters(searchParams);
-    const logs = await fetchFilteredLogs(filters, true);
+    const logs = await fetchFilteredLogs(filters, true, session);
     const { buffer, contentType, filename } = generateLogsExport(logs, format, {
       startDate: filters.startDate,
       endDate: filters.endDate,

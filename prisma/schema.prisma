@@ -8,11 +8,26 @@ datasource db {
 }
 
 enum UserRole {
-  ADMINISTRADOR
+  SUPER_ADMIN
+  COMPANY_ADMIN
   SUPERVISOR
-  OPERADOR
-  MANTENIMIENTO
-  SOLO_CONSULTA
+  OPERATOR
+  MAINTENANCE
+  VIEWER
+}
+
+enum UserStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  DISABLED
+  DELETED
+}
+
+enum CompanyStatus {
+  ACTIVE
+  DISABLED
+  DELETED
 }
 
 enum BoilerType {
@@ -123,26 +138,47 @@ enum AuditAction {
   CAMBIAR_LIMITES_CALDERA
 }
 
+model Company {
+  id        String        @id @default(cuid())
+  name      String
+  status    CompanyStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+
+  users   User[]
+  plants  Plant[]
+  boilers Boiler[]
+}
+
 model User {
-  id                 String    @id @default(cuid())
-  username           String    @unique
-  email              String    @unique
+  id                 String     @id @default(cuid())
+  username           String     @unique
+  email              String     @unique
+  name               String
   passwordHash       String
-  role               UserRole  @default(OPERADOR)
-  isActive           Boolean   @default(true)
-  mustChangePassword Boolean   @default(false)
+  role               UserRole   @default(OPERATOR)
+  status             UserStatus @default(PENDING_APPROVAL)
+  companyId          String?
+  rejectionReason    String?
+  mustChangePassword Boolean    @default(false)
   passwordChangedAt  DateTime?
   lastLoginAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
 
-  boilerLogs              BoilerLog[]              @relation("OperatorLogs")
-  reviewedLogs            BoilerLog[]              @relation("SupervisorReviews")
-  alertsCaptured          Alert[]                  @relation("AlertCapturedBy")
-  maintenanceOrders       MaintenanceOrder[]       @relation("MaintenanceResponsible")
+  company                 Company?             @relation(fields: [companyId], references: [id])
+  boilerLogs              BoilerLog[]          @relation("OperatorLogs")
+  reviewedLogs            BoilerLog[]          @relation("SupervisorReviews")
+  alertsCaptured          Alert[]              @relation("AlertCapturedBy")
+  maintenanceOrders       MaintenanceOrder[]   @relation("MaintenanceResponsible")
   auditLogs               AuditLog[]
   passwordResetTokens     PasswordResetToken[]
   attachments             Attachment[]
+
+  @@index([companyId])
+  @@index([status])
 }
 
 model Plant {
@@ -150,115 +186,121 @@ model Plant {
   name      String
   client    String
   location  String?
+  companyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  company Company? @relation(fields: [companyId], references: [id])
   boilers Boiler[]
 }
 
 model Boiler {
-  id                    String       @id @default(cuid())
-  internalId            String       @unique
-  name                  String
-  brand                 String?
-  model                 String?
-  serialNumber          String?
-  capacityHp            Float?
-  capacityKgH           Float?
-  capacityLbH           Float?
-  type                  BoilerType
-  fuelType              FuelType
-  designPressure        Float?
-  operatingPressure     Float?
-  operatingTemperature  Float?
-  location              String?
-  installationDate      DateTime?
-  lastInspectionDate    DateTime?
-  nextInspectionDate    DateTime?
-  status                BoilerStatus @default(OPERANDO)
-  technicalNotes        String?
-  plantId               String?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  id                   String       @id @default(cuid())
+  internalId           String       @unique
+  name                 String
+  brand                String?
+  model                String?
+  serialNumber         String?
+  capacityHp           Float?
+  capacityKgH          Float?
+  capacityLbH          Float?
+  type                 BoilerType
+  fuelType             FuelType
+  designPressure       Float?
+  operatingPressure    Float?
+  operatingTemperature Float?
+  location             String?
+  installationDate     DateTime?
+  lastInspectionDate   DateTime?
+  nextInspectionDate   DateTime?
+  status               BoilerStatus @default(OPERANDO)
+  technicalNotes       String?
+  plantId              String?
+  companyId            String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  plant           Plant?                @relation(fields: [plantId], references: [id])
-  operatingLimits BoilerOperatingLimit?
-  logs            BoilerLog[]
-  alerts          Alert[]
+  company           Company?              @relation(fields: [companyId], references: [id])
+  plant             Plant?                @relation(fields: [plantId], references: [id])
+  operatingLimits   BoilerOperatingLimit?
+  logs              BoilerLog[]
+  alerts            Alert[]
   maintenanceOrders MaintenanceOrder[]
+
+  @@index([companyId])
 }
 
 model BoilerOperatingLimit {
-  id                    String   @id @default(cuid())
-  boilerId              String   @unique
-  pressureMin           Float?
-  pressureMax           Float?
-  temperatureMin        Float?
-  temperatureMax        Float?
-  waterLevelMin         Float?
-  waterLevelMax         Float?
-  conductivityMax       Float?
-  tdsMax                Float?
-  phMin                 Float?
-  phMax                 Float?
-  hardnessMax           Float?
-  o2Min                 Float?
-  o2Max                 Float?
-  coMax                 Float?
-  flueGasTempMax        Float?
-  gasPressureMin        Float?
-  gasPressureMax        Float?
-  airPressureMin        Float?
-  airPressureMax        Float?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id               String   @id @default(cuid())
+  boilerId         String   @unique
+  pressureMin      Float?
+  pressureMax      Float?
+  temperatureMin   Float?
+  temperatureMax   Float?
+  waterLevelMin    Float?
+  waterLevelMax    Float?
+  conductivityMax  Float?
+  tdsMax           Float?
+  phMin            Float?
+  phMax            Float?
+  hardnessMax      Float?
+  o2Min            Float?
+  o2Max            Float?
+  coMax            Float?
+  flueGasTempMax    Float?
+  gasPressureMin   Float?
+  gasPressureMax   Float?
+  airPressureMin   Float?
+  airPressureMax   Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   boiler Boiler @relation(fields: [boilerId], references: [id], onDelete: Cascade)
 }
 
 model BoilerLog {
-  id                      String              @id @default(cuid())
-  logDate                 DateTime            @default(now())
-  boilerId                String
-  operatorId              String
-  shift                   ShiftType
-  customShift             String?
-  accumulatedHours        Float?
-  loadLevel               LoadLevel?
-  loadPercentage          Float?
-  operationalState        LogOperationalState @default(NORMAL)
-  steamPressure           Float?
-  steamTemperature        Float?
-  feedwaterPressure       Float?
-  feedwaterTemperature    Float?
-  condensateReturnTemp    Float?
-  waterLevel              Float?
-  feedPumpStatus          String?
-  alternatePumpStatus     String?
-  fuelPressure            Float?
-  airPressure             Float?
-  fanFrequency            Float?
-  modulationPosition      Float?
-  generalObservations     String?
-  abnormalCondition       String?
+  id                        String              @id @default(cuid())
+  logDate                   DateTime            @default(now())
+  boilerId                  String
+  operatorId                String
+  shift                     ShiftType
+  customShift               String?
+  accumulatedHours          Float?
+  loadLevel                 LoadLevel?
+  loadPercentage            Float?
+  operationalState          LogOperationalState @default(NORMAL)
+  steamPressure             Float?
+  steamTemperature          Float?
+  feedwaterPressure         Float?
+  feedwaterTemperature      Float?
+  condensateReturnTemp      Float?
+  waterLevel                Float?
+  feedPumpStatus            String?
+  alternatePumpStatus       String?
+  fuelPressure              Float?
+  airPressure               Float?
+  fanFrequency              Float?
+  modulationPosition        Float?
+  generalObservations       String?
+  abnormalCondition         String?
   immediateCorrectiveAction String?
-  requiresMaintenance     Boolean             @default(false)
-  maintenancePriority     MaintenancePriority?
-  operatorSignature       String?
-  supervisorComments      String?
-  status                  LogStatus           @default(BORRADOR)
-  version                 Int                 @default(1)
-  parentLogId             String?
-  reviewedById            String?
-  reviewedAt              DateTime?
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
+  requiresMaintenance       Boolean             @default(false)
+  maintenancePriority       MaintenancePriority?
+  operatorSignature         String?
+  supervisorComments        String?
+  status                    LogStatus           @default(BORRADOR)
+  version                   Int                 @default(1)
+  parentLogId               String?
+  reviewedById              String?
+  reviewedAt                DateTime?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 
-  boiler            Boiler                  @relation(fields: [boilerId], references: [id])
-  operator          User                    @relation("OperatorLogs", fields: [operatorId], references: [id])
-  reviewedBy        User?                   @relation("SupervisorReviews", fields: [reviewedById], references: [id])
-  parentLog         BoilerLog?              @relation("LogVersions", fields: [parentLogId], references: [id])
-  childVersions     BoilerLog[]             @relation("LogVersions")
+  boiler            Boiler                     @relation(fields: [boilerId], references: [id])
+  operator          User                       @relation("OperatorLogs", fields: [operatorId], references: [id])
+  reviewedBy        User?                      @relation("SupervisorReviews", fields: [reviewedById], references: [id])
+  parentLog         BoilerLog?                 @relation("LogVersions", fields: [parentLogId], references: [id])
+  childVersions     BoilerLog[]                @relation("LogVersions")
   combustion        BoilerLogCombustion?
   waterTreatment    BoilerLogWaterTreatment?
   safetyChecklist   BoilerLogSafetyChecklist[]
@@ -273,36 +315,36 @@ model BoilerLog {
 }
 
 model BoilerLogCombustion {
-  id                String   @id @default(cuid())
-  boilerLogId       String   @unique
-  flueGasTemperature Float?
-  o2                Float?
-  co                Float?
-  co2               Float?
-  excessAir         Float?
+  id                  String  @id @default(cuid())
+  boilerLogId         String  @unique
+  flueGasTemperature  Float?
+  o2                  Float?
+  co                  Float?
+  co2                 Float?
+  excessAir           Float?
   estimatedEfficiency Float?
-  fuelConsumption   Float?
-  steamFlow         Float?
+  fuelConsumption     Float?
+  steamFlow           Float?
 
   boilerLog BoilerLog @relation(fields: [boilerLogId], references: [id], onDelete: Cascade)
 }
 
 model BoilerLogWaterTreatment {
-  id                    String   @id @default(cuid())
-  boilerLogId           String   @unique
-  ph                    Float?
-  conductivity          Float?
-  tds                   Float?
-  hardness              Float?
-  sulfites              Float?
-  phosphates            Float?
-  alkalinity            Float?
-  chlorides             Float?
-  bottomBlowdownDone    Boolean  @default(false)
-  surfaceBlowdownDone   Boolean  @default(false)
-  softenerInService     Boolean  @default(false)
-  regenerationDone      Boolean  @default(false)
-  observations          String?
+  id                  String  @id @default(cuid())
+  boilerLogId         String  @unique
+  ph                  Float?
+  conductivity        Float?
+  tds                 Float?
+  hardness            Float?
+  sulfites            Float?
+  phosphates          Float?
+  alkalinity          Float?
+  chlorides           Float?
+  bottomBlowdownDone  Boolean @default(false)
+  surfaceBlowdownDone Boolean @default(false)
+  softenerInService   Boolean @default(false)
+  regenerationDone    Boolean @default(false)
+  observations        String?
 
   boilerLog BoilerLog @relation(fields: [boilerLogId], references: [id], onDelete: Cascade)
 }
@@ -336,9 +378,9 @@ model Alert {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  boiler       Boiler             @relation(fields: [boilerId], references: [id])
-  boilerLog    BoilerLog?         @relation(fields: [boilerLogId], references: [id])
-  capturedBy   User               @relation("AlertCapturedBy", fields: [capturedById], references: [id])
+  boiler            Boiler             @relation(fields: [boilerId], references: [id])
+  boilerLog         BoilerLog?         @relation(fields: [boilerLogId], references: [id])
+  capturedBy        User               @relation("AlertCapturedBy", fields: [capturedById], references: [id])
   maintenanceOrders MaintenanceOrder[]
 
   @@index([alertDate])
@@ -348,23 +390,23 @@ model Alert {
 }
 
 model MaintenanceOrder {
-  id              String            @id @default(cuid())
-  orderNumber     String            @unique
-  boilerId        String
-  type            MaintenanceType
-  priority        MaintenancePriority @default(MEDIA)
-  createdAt       DateTime          @default(now())
-  scheduledDate   DateTime?
-  responsibleId   String?
-  description     String
-  finding         String?
-  actionTaken     String?
-  partsUsed       String?
-  status          MaintenanceStatus @default(ABIERTA)
-  alertId         String?
-  boilerLogId     String?
-  closedAt        DateTime?
-  updatedAt       DateTime          @updatedAt
+  id            String              @id @default(cuid())
+  orderNumber   String              @unique
+  boilerId      String
+  type          MaintenanceType
+  priority      MaintenancePriority @default(MEDIA)
+  createdAt     DateTime            @default(now())
+  scheduledDate DateTime?
+  responsibleId String?
+  description   String
+  finding       String?
+  actionTaken   String?
+  partsUsed     String?
+  status        MaintenanceStatus   @default(ABIERTA)
+  alertId       String?
+  boilerLogId   String?
+  closedAt      DateTime?
+  updatedAt     DateTime            @updatedAt
 
   boiler      Boiler                @relation(fields: [boilerId], references: [id])
   responsible User?                 @relation("MaintenanceResponsible", fields: [responsibleId], references: [id])
@@ -388,13 +430,13 @@ model MaintenanceEvidence {
 }
 
 model Attachment {
-  id          String   @id @default(cuid())
-  fileName    String
-  fileUrl     String
-  mimeType    String?
-  boilerLogId String?
+  id           String   @id @default(cuid())
+  fileName     String
+  fileUrl      String
+  mimeType     String?
+  boilerLogId  String?
   uploadedById String?
-  uploadedAt  DateTime @default(now())
+  uploadedAt   DateTime @default(now())
 
   boilerLog  BoilerLog? @relation(fields: [boilerLogId], references: [id])
   uploadedBy User?      @relation(fields: [uploadedById], references: [id])
@@ -411,15 +453,15 @@ model ParameterDefinition {
 }
 
 model AuditLog {
-  id           String      @id @default(cuid())
-  userId       String?
-  action       AuditAction
-  module       String
-  recordId     String?
-  previousValue String?    @db.Text
-  newValue     String?     @db.Text
-  ipAddress    String?
-  createdAt    DateTime    @default(now())
+  id            String      @id @default(cuid())
+  userId        String?
+  action        AuditAction
+  module        String
+  recordId      String?
+  previousValue String?     @db.Text
+  newValue      String?     @db.Text
+  ipAddress     String?
+  createdAt     DateTime    @default(now())
 
   user User? @relation(fields: [userId], references: [id])
 
@@ -429,12 +471,14 @@ model AuditLog {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  token     String   @unique
+  tokenHash String
   expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
 }

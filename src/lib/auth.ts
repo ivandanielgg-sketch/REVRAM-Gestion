@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { UserRole } from "@/generated/prisma/client";
+import { UserRole, UserStatus } from "@/generated/prisma/client";
 import { verifySessionToken } from "@/lib/session";
 
 export const SESSION_COOKIE = "boiler_session";
@@ -14,7 +14,11 @@ export interface SessionUser {
   id: string;
   username: string;
   email: string;
+  name: string;
   role: UserRole;
+  status: UserStatus;
+  companyId: string | null;
+  companyName: string | null;
   mustChangePassword: boolean;
 }
 
@@ -43,12 +47,24 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
+export async function hashToken(token: string): Promise<string> {
+  return bcrypt.hash(token, 10);
+}
+
+export async function verifyTokenHash(token: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(token, hash);
+}
+
 export async function createSessionToken(user: SessionUser): Promise<string> {
   return new SignJWT({
     id: user.id,
     username: user.username,
     email: user.email,
+    name: user.name,
     role: user.role,
+    status: user.status,
+    companyId: user.companyId,
+    companyName: user.companyName,
     mustChangePassword: user.mustChangePassword,
   })
     .setProtectedHeader({ alg: "HS256" })
@@ -85,4 +101,9 @@ export function getClientIp(request: Request): string | undefined {
     request.headers.get("x-real-ip") ||
     undefined
   );
+}
+
+export function usernameFromEmail(email: string): string {
+  const base = email.split("@")[0].replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 40);
+  return base || "user";
 }

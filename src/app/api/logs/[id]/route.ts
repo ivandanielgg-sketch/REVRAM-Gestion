@@ -7,15 +7,18 @@ import { boilerLogSchema, approveLogSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
 import { SAFETY_CHECKLIST_ITEMS } from "@/lib/constants";
+import { getLogForSession, getBoilerForSession } from "@/lib/tenant-access";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requirePermission(request, "logs.view");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "logs.view");
+  if (error || !session) return error;
 
   const { id } = await params;
+  const access = await getLogForSession(id, session);
+  if (!access) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const log = await prisma.boilerLog.findUnique({
     where: { id },
     include: {
@@ -42,6 +45,9 @@ export async function PUT(
   if (error || !session) return error;
 
   const { id } = await params;
+  const access = await getLogForSession(id, session);
+  if (!access) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
   const existing = await prisma.boilerLog.findUnique({
     where: { id },
     include: { safetyChecklist: true },
@@ -144,6 +150,9 @@ export async function PATCH(
   }
 
   const { id } = await params;
+  const access = await getLogForSession(id, session);
+  if (!access) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
   const body = await request.json();
   const parsed = approveLogSchema.safeParse(body);
   if (!parsed.success) {
@@ -218,6 +227,9 @@ export async function POST(
   if (error || !session) return error;
 
   const { id } = await params;
+  const access = await getLogForSession(id, session);
+  if (!access) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
   const original = await prisma.boilerLog.findUnique({
     where: { id },
     include: { combustion: true, waterTreatment: true, safetyChecklist: true },
@@ -308,10 +320,13 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requirePermission(request, "logs.edit");
-  if (error) return error;
+  const { error, session } = await requirePermission(request, "logs.edit");
+  if (error || !session) return error;
 
   const { id } = await params;
+  const access = await getLogForSession(id, session);
+  if (!access) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
   const log = await prisma.boilerLog.findUnique({ where: { id } });
   if (!log) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   if (log.status === "APROBADO") {

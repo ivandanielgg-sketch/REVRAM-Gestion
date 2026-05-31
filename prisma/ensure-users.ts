@@ -11,7 +11,7 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await ensureDefaultUsers(prisma);
-  const count = await prisma.user.count({ where: { isActive: true } });
+  const count = await prisma.user.count({ where: { status: "ACTIVE", deletedAt: null } });
   console.log(`Usuarios base verificados. Total activos en BD: ${count}`);
 }
 

@@ -35,12 +35,42 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
   });
 
+export const registerSchema = z
+  .object({
+    email: z.string().email("Correo electrónico inválido"),
+    name: z.string().min(1, "Nombre completo requerido"),
+    companyName: z.string().min(1, "Nombre de empresa requerido"),
+    password: z.string().min(8, "La contraseña debe tener mínimo 8 caracteres"),
+    confirmPassword: z.string().min(1, "Confirme la contraseña"),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  });
+
 export const userSchema = z.object({
   username: z.string().min(3),
   email: z.string().email(),
+  name: z.string().min(1).optional(),
   password: z.string().min(8).optional(),
-  role: z.enum(["ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "MANTENIMIENTO", "SOLO_CONSULTA"]),
-  isActive: z.boolean().default(true),
+  role: z.enum(["SUPER_ADMIN", "COMPANY_ADMIN", "SUPERVISOR", "OPERATOR", "MAINTENANCE", "VIEWER"]),
+  status: z.enum(["PENDING_APPROVAL", "ACTIVE", "REJECTED", "DISABLED", "DELETED"]).optional(),
+  companyId: z.string().optional().nullable(),
+});
+
+export const adminUserUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  role: z.enum(["SUPER_ADMIN", "COMPANY_ADMIN", "SUPERVISOR", "OPERATOR", "MAINTENANCE", "VIEWER"]).optional(),
+  status: z.enum(["PENDING_APPROVAL", "ACTIVE", "REJECTED", "DISABLED", "DELETED"]).optional(),
+  companyId: z.string().optional().nullable(),
+  password: z.string().min(8).optional(),
+  rejectionReason: z.string().optional().nullable(),
+});
+
+export const companySchema = z.object({
+  name: z.string().min(1, "Nombre requerido"),
+  status: z.enum(["ACTIVE", "DISABLED", "DELETED"]).optional(),
 });
 
 const optionalNumber = z.preprocess(
@@ -64,6 +94,7 @@ export const boilerSchema = z.object({
   operatingTemperature: optionalNumber,
   location: z.string().optional(),
   plantId: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
   installationDate: z.string().optional().nullable(),
   lastInspectionDate: z.string().optional().nullable(),
   nextInspectionDate: z.string().optional().nullable(),

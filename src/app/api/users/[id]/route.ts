@@ -1,29 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/api-auth";
+import { requireAnyPermission } from "@/lib/api-auth";
 import { userSchema } from "@/lib/validations/schemas";
 import { hashPassword } from "@/lib/auth";
+import { assertCompanyAccess, isSuperAdmin } from "@/lib/tenant";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requirePermission(request, "users.manage");
-  if (error) return error;
+  const { error, session } = await requireAnyPermission(request, [
+    "users.manage",
+    "users.manage_company",
+  ]);
+  if (error || !session) return error;
 
   const { id } = await params;
+  const target = await prisma.user.findUnique({ where: { id, deletedAt: null } });
+  if (!target) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+  if (!isSuperAdmin(session.role) && !assertCompanyAccess(session, target.companyId)) {
+    return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
+  }
+
   const body = await request.json();
   const parsed = userSchema.partial().safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const data: Record<string, unknown> = {
-    username: parsed.data.username,
-    email: parsed.data.email,
-    role: parsed.data.role,
-    isActive: parsed.data.isActive,
-  };
+  const data: Record<string, unknown> = {};
+  if (parsed.data.username !== undefined) data.username = parsed.data.username;
+  if (parsed.data.email !== undefined) data.email = parsed.data.email;
+  if (parsed.data.name !== undefined) data.name = parsed.data.name;
+  if (parsed.data.role !== undefined) data.role = parsed.data.role;
+  if (parsed.data.status !== undefined) data.status = parsed.data.status;
+  if (parsed.data.companyId !== undefined && isSuperAdmin(session.role)) {
+    data.companyId = parsed.data.companyId;
+  }
   if (parsed.data.password) {
     data.passwordHash = await hashPassword(parsed.data.password);
   }
@@ -35,8 +49,10 @@ export async function PUT(
       id: true,
       username: true,
       email: true,
+      name: true,
       role: true,
-      isActive: true,
+      status: true,
+      companyId: true,
     },
   });
 

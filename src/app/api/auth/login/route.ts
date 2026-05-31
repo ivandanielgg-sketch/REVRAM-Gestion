@@ -8,6 +8,7 @@ import {
   SESSION_COOKIE,
 } from "@/lib/auth";
 import { loginSchema } from "@/lib/validations/schemas";
+import { isLoginAllowedStatus, loginBlockedMessage } from "@/lib/session";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,12 +21,24 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findFirst({
       where: {
         OR: [{ username: parsed.data.username }, { email: parsed.data.username }],
-        isActive: true,
+        deletedAt: null,
       },
+      include: { company: true },
     });
 
     if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
       return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
+    }
+
+    if (!isLoginAllowedStatus(user.status)) {
+      return NextResponse.json({ error: loginBlockedMessage(user.status) }, { status: 403 });
+    }
+
+    if (user.company && user.company.status !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "La empresa asociada a su cuenta está deshabilitada. Contacte al administrador." },
+        { status: 403 }
+      );
     }
 
     await prisma.user.update({
@@ -33,24 +46,21 @@ export async function POST(request: NextRequest) {
       data: { lastLoginAt: new Date() },
     });
 
-    const token = await createSessionToken({
+    const sessionUser = {
       id: user.id,
       username: user.username,
       email: user.email,
+      name: user.name,
       role: user.role,
+      status: user.status,
+      companyId: user.companyId,
+      companyName: user.company?.name ?? null,
       mustChangePassword: user.mustChangePassword,
-    });
+    };
 
-    const response = NextResponse.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        mustChangePassword: user.mustChangePassword,
-      },
-    });
+    const token = await createSessionToken(sessionUser);
 
+    const response = NextResponse.json({ user: sessionUser });
     return attachSessionCookie(response, token);
   } catch (error) {
     console.error("[auth/login]", error);
