@@ -5,6 +5,7 @@ import { boilerSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
 import { companyFilter } from "@/lib/tenant";
+import { assertPlantBelongsToCompany, resolveTargetCompanyId } from "@/lib/security";
 
 export async function GET(request: NextRequest) {
   const { error, session } = await requirePermission(request, "boilers.view");
@@ -28,14 +29,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const companyId = session.companyId;
-  if (!companyId && session.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Empresa no asignada" }, { status: 400 });
-  }
-
-  const targetCompanyId = parsed.data.companyId || companyId;
+  const targetCompanyId = resolveTargetCompanyId(session, parsed.data.companyId);
   if (!targetCompanyId) {
     return NextResponse.json({ error: "Empresa requerida" }, { status: 400 });
+  }
+
+  if (!(await assertPlantBelongsToCompany(parsed.data.plantId, targetCompanyId))) {
+    return NextResponse.json({ error: "Planta no pertenece a su empresa" }, { status: 403 });
   }
 
   const data = parsed.data;

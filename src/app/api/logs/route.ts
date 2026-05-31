@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/lib/api-auth";
 import { evaluateAlerts } from "@/lib/alerts";
 import { boilerLogSchema } from "@/lib/validations/schemas";
@@ -8,6 +9,7 @@ import { getClientIp } from "@/lib/auth";
 import { SAFETY_CHECKLIST_ITEMS } from "@/lib/constants";
 import { parseLogsFilters, fetchFilteredLogs } from "@/lib/logs-query";
 import { getBoilerForSession } from "@/lib/tenant-access";
+import { assertUserBelongsToCompany } from "@/lib/security";
 
 export async function GET(request: NextRequest) {
   const { error, session } = await requirePermission(request, "logs.view");
@@ -34,6 +36,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Caldera no encontrada o sin acceso" }, { status: 403 });
   }
 
+  if (!(await assertUserBelongsToCompany(parsed.data.operatorId, boiler.companyId))) {
+    return NextResponse.json({ error: "Operador no pertenece a su empresa" }, { status: 403 });
+  }
+
   const data = parsed.data;
   const checklist =
     data.safetyChecklist ??
@@ -54,18 +60,24 @@ export async function POST(request: NextRequest) {
       loadLevel: data.loadLevel,
       loadPercentage: data.loadPercentage,
       operationalState: data.operationalState,
-      steamPressure: data.steamPressure,
-      steamTemperature: data.steamTemperature,
-      feedwaterPressure: data.feedwaterPressure,
-      feedwaterTemperature: data.feedwaterTemperature,
-      condensateReturnTemp: data.condensateReturnTemp,
-      waterLevel: data.waterLevel,
+      steamPressureKgCm2: data.steamPressureKgCm2,
+      steamTemperatureC: data.steamTemperatureC,
+      feedwaterPressureKgCm2: data.feedwaterPressureKgCm2,
+      feedwaterTemperatureC: data.feedwaterTemperatureC,
+      condensateReturnTemperatureC: data.condensateReturnTemperatureC,
+      waterLevelPercent: data.waterLevelPercent,
       feedPumpStatus: data.feedPumpStatus,
       alternatePumpStatus: data.alternatePumpStatus,
-      fuelPressure: data.fuelPressure,
+      feedPumpPressureKgCm2: data.feedPumpPressureKgCm2,
+      alternatePumpPressureKgCm2: data.alternatePumpPressureKgCm2,
+      fuelPressureValue: data.fuelPressureValue,
+      fuelPressureUnit: data.fuelPressureUnit,
+      operatingFuelType: data.operatingFuelType,
+      fuelConsumptionValue: data.fuelConsumptionValue,
+      fuelConsumptionUnit: data.fuelConsumptionUnit,
       airPressure: data.airPressure,
-      fanFrequency: data.fanFrequency,
-      modulationPosition: data.modulationPosition,
+      fanFrequencyHz: data.fanFrequencyHz,
+      modulationPositionDegrees: data.modulationPositionDegrees,
       generalObservations: data.generalObservations,
       abnormalCondition: data.abnormalCondition,
       immediateCorrectiveAction: data.immediateCorrectiveAction,
@@ -93,14 +105,15 @@ export async function POST(request: NextRequest) {
   });
 
   const alertInputs = evaluateAlerts(log.boiler.operatingLimits, {
-    steamPressure: log.steamPressure,
-    steamTemperature: log.steamTemperature,
-    waterLevel: log.waterLevel,
+    steamPressureKgCm2: log.steamPressureKgCm2,
+    steamTemperatureC: log.steamTemperatureC,
+    waterLevelPercent: log.waterLevelPercent,
     ph: log.waterTreatment?.ph,
-    conductivity: log.waterTreatment?.conductivity,
-    o2: log.combustion?.o2,
-    co: log.combustion?.co,
-    flueGasTemperature: log.combustion?.flueGasTemperature,
+    conductivityUsCm: log.waterTreatment?.conductivityUsCm,
+    tdsPpm: log.waterTreatment?.tdsPpm,
+    o2Percent: log.combustion?.o2Percent,
+    coPpm: log.combustion?.coPpm,
+    flueGasTemperatureC: log.combustion?.flueGasTemperatureC,
     requiresMaintenance: log.requiresMaintenance,
     maintenancePriority: log.maintenancePriority,
     safetyChecklist: log.safetyChecklist.map((s) => ({

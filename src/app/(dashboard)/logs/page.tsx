@@ -14,8 +14,8 @@ interface Log {
   logDate: string;
   shift: string;
   status: string;
-  steamPressure: number | null;
-  waterLevel: number | null;
+  steamPressureKgCm2: number | null;
+  waterLevelPercent: number | null;
   requiresMaintenance: boolean;
   boiler: { name: string; plant: { client: string } | null };
   operator: { username: string };
@@ -149,8 +149,8 @@ export default function LogsHistoryPage() {
                   <td className="px-4 py-3">{log.boiler.name}</td>
                   <td className="px-4 py-3">{log.operator.username}</td>
                   <td className="px-4 py-3">{log.shift}</td>
-                  <td className="px-4 py-3">{log.steamPressure ?? "—"}</td>
-                  <td className="px-4 py-3">{log.waterLevel ?? "—"}</td>
+                  <td className="px-4 py-3">{log.steamPressureKgCm2 ?? "—"}</td>
+                  <td className="px-4 py-3">{log.waterLevelPercent ?? "—"}</td>
                   <td className="px-4 py-3">
                     <Badge className="bg-slate-100 text-slate-700">{LOG_STATUS_LABELS[log.status]}</Badge>
                   </td>

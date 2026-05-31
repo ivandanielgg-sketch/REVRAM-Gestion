@@ -51,6 +51,7 @@ export const BOILER_TYPE_LABELS: Record<string, string> = {
   ACUOTUBULAR: "Acuotubular",
   AGUA_CALIENTE: "Agua caliente",
   ACEITE_TERMICO: "Aceite térmico",
+  MIXTA: "Mixta, Tubos de humo y Acuotubular",
   OTRO: "Otro",
 };
 
@@ -60,8 +61,33 @@ export const FUEL_TYPE_LABELS: Record<string, string> = {
   DIESEL: "Diésel",
   COMBUSTOLEO: "Combustóleo",
   DUAL: "Dual",
+  BIOMASA: "Biomasa",
   OTRO: "Otro",
 };
+
+export const OPERATING_FUEL_LABELS: Record<string, string> = {
+  GAS_NATURAL: "Gas natural",
+  GAS_LP: "Gas LP",
+  DIESEL: "Diésel",
+  COMBUSTOLEO: "Combustóleo",
+  BIOMASA: "Biomasa",
+  OTRO: "Otro",
+};
+
+export const PLANT_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Activa",
+  DISABLED: "Deshabilitada",
+};
+
+export function displayBoilerType(type: string, customType?: string | null): string {
+  if (type === "OTRO" && customType) return customType;
+  return BOILER_TYPE_LABELS[type] || type;
+}
+
+export function displayFuelType(fuelType: string, customFuelType?: string | null): string {
+  if (fuelType === "OTRO" && customFuelType) return customFuelType;
+  return FUEL_TYPE_LABELS[fuelType] || fuelType;
+}
 
 export const LOG_STATUS_LABELS: Record<string, string> = {
   BORRADOR: "Borrador",

@@ -5,6 +5,7 @@ import { boilerSchema, operatingLimitsSchema } from "@/lib/validations/schemas";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
 import { getBoilerForSession } from "@/lib/tenant-access";
+import { assertPlantBelongsToCompany } from "@/lib/security";
 
 export async function GET(
   request: NextRequest,
@@ -34,6 +35,10 @@ export async function PUT(
   const parsed = boilerSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+  }
+
+  if (!(await assertPlantBelongsToCompany(parsed.data.plantId, existing.companyId))) {
+    return NextResponse.json({ error: "Planta no pertenece a su empresa" }, { status: 403 });
   }
 
   const data = parsed.data;

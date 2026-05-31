@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHeader, LoadingState } from "@/components/ui/Common";
 import { Badge } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { BOILER_TYPE_LABELS, FUEL_TYPE_LABELS, STATUS_COLORS } from "@/lib/constants";
+import { displayBoilerType, displayFuelType, STATUS_COLORS } from "@/lib/constants";
 
 interface Boiler {
   id: string;
@@ -13,9 +13,11 @@ interface Boiler {
   name: string;
   brand: string | null;
   type: string;
+  customType?: string | null;
   fuelType: string;
+  customFuelType?: string | null;
   status: string;
-  plant: { name: string; client: string } | null;
+  plant: { name: string; client: string | null } | null;
 }
 
 export default function BoilersPage() {
@@ -64,8 +66,8 @@ export default function BoilersPage() {
                 <td className="px-4 py-3 font-mono text-xs">{b.internalId}</td>
                 <td className="px-4 py-3 font-medium">{b.name}</td>
                 <td className="px-4 py-3">{b.brand || "—"}</td>
-                <td className="px-4 py-3">{BOILER_TYPE_LABELS[b.type]}</td>
-                <td className="px-4 py-3">{FUEL_TYPE_LABELS[b.fuelType]}</td>
+                <td className="px-4 py-3">{displayBoilerType(b.type, b.customType)}</td>
+                <td className="px-4 py-3">{displayFuelType(b.fuelType, b.customFuelType)}</td>
                 <td className="px-4 py-3">{b.plant?.name || "—"}</td>
                 <td className="px-4 py-3">
                   <Badge className={STATUS_COLORS[b.status]}>

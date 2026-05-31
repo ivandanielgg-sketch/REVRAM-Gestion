@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     openAlerts,
     pendingApproval,
     criticalAlerts,
+    company,
   ] = await Promise.all([
     prisma.boiler.findMany({
       where: companyWhere,
@@ -50,10 +51,17 @@ export async function GET(request: NextRequest) {
     prisma.alert.count({
       where: { severity: "CRITICO", status: "ABIERTA", ...alertCompanyWhere },
     }),
+    session.companyId
+      ? prisma.company.findUnique({
+          where: { id: session.companyId },
+          select: { logoUrl: true, name: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   return NextResponse.json({
     boilers,
+    company: company ? { logoUrl: company.logoUrl, name: company.name } : null,
     stats: {
       totalBoilers: boilers.length,
       boilersOperating,

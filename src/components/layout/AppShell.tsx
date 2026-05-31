@@ -30,6 +30,7 @@ export interface AppShellUser {
   name: string;
   role: string;
   companyName?: string | null;
+  logoUrl?: string | null;
 }
 
 const navItems: {
@@ -56,9 +57,16 @@ function GlobalHeader({ user, onLogout }: { user: AppShellUser; onLogout: () => 
   return (
     <header className="border-b border-slate-700 bg-slate-900 px-4 py-3 text-white">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold tracking-wide text-slate-100">{BRAND_TITLE}</p>
-          <p className="text-xs text-slate-400">Plataforma industrial de bitácoras</p>
+        <div className="flex items-center gap-3">
+          {user.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.logoUrl} alt={user.companyName || "Logo empresa"} className="max-h-10 object-contain" />
+          ) : (
+            <div>
+              <p className="text-sm font-semibold tracking-wide text-slate-100">{BRAND_TITLE}</p>
+              <p className="text-xs text-slate-400">Plataforma industrial de bitácoras</p>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
           <span className="inline-flex items-center gap-1">

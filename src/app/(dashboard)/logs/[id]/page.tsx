@@ -17,8 +17,8 @@ interface LogDetail {
   shift: string;
   status: string;
   operationalState: string;
-  steamPressure: number | null;
-  waterLevel: number | null;
+  steamPressureKgCm2: number | null;
+  waterLevelPercent: number | null;
   operatorSignature: string | null;
   generalObservations: string | null;
   abnormalCondition: string | null;
@@ -129,8 +129,8 @@ export default function LogDetailPage() {
             <div className="flex justify-between"><dt className="text-slate-500">Operador</dt><dd>{log.operator.username}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Turno</dt><dd>{log.shift}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Estado operativo</dt><dd>{log.operationalState}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Presión vapor</dt><dd>{String(log.steamPressure ?? "—")}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Nivel agua</dt><dd>{String(log.waterLevel ?? "—")}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Presión vapor (kg/cm²)</dt><dd>{String(log.steamPressureKgCm2 ?? "—")}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Nivel agua (%)</dt><dd>{String(log.waterLevelPercent ?? "—")}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Firma operador</dt><dd>{log.operatorSignature || "—"}</dd></div>
           </dl>
         </Card>

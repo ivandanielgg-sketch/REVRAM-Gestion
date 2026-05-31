@@ -1,22 +1,27 @@
-export interface OperatingLimitsRecord {
-  pressureMin?: number | null;
-  pressureMax?: number | null;
-  temperatureMin?: number | null;
-  temperatureMax?: number | null;
-  waterLevelMin?: number | null;
-  waterLevelMax?: number | null;
-  conductivityMax?: number | null;
-  tdsMax?: number | null;
+export interface OperatingLimitsShape {
+  pressureMinKgCm2?: number | null;
+  pressureMaxKgCm2?: number | null;
+  temperatureMinC?: number | null;
+  temperatureMaxC?: number | null;
+  waterLevelMinPercent?: number | null;
+  waterLevelMaxPercent?: number | null;
+  conductivityMaxUsCm?: number | null;
+  tdsMaxPpm?: number | null;
   phMin?: number | null;
   phMax?: number | null;
-  o2Min?: number | null;
-  o2Max?: number | null;
-  coMax?: number | null;
-  flueGasTempMax?: number | null;
+  o2MinPercent?: number | null;
+  o2MaxPercent?: number | null;
+  coMaxPpm?: number | null;
+  stackTemperatureMaxC?: number | null;
   gasPressureMin?: number | null;
   gasPressureMax?: number | null;
   airPressureMin?: number | null;
   airPressureMax?: number | null;
+}
+
+export interface LimitBand {
+  min?: number;
+  max?: number;
 }
 
 export interface MetricLimitBand {
@@ -24,23 +29,23 @@ export interface MetricLimitBand {
   max?: number | null;
 }
 
-type LimitKey = keyof OperatingLimitsRecord;
+type LimitKey = keyof OperatingLimitsShape;
 
 const METRIC_LIMIT_MAP: Record<string, { min?: LimitKey; max?: LimitKey }> = {
-  steamPressure: { min: "pressureMin", max: "pressureMax" },
-  steamTemperature: { min: "temperatureMin", max: "temperatureMax" },
-  waterLevel: { min: "waterLevelMin", max: "waterLevelMax" },
+  steamPressureKgCm2: { min: "pressureMinKgCm2", max: "pressureMaxKgCm2" },
+  steamTemperatureC: { min: "temperatureMinC", max: "temperatureMaxC" },
+  waterLevelPercent: { min: "waterLevelMinPercent", max: "waterLevelMaxPercent" },
   ph: { min: "phMin", max: "phMax" },
-  conductivity: { max: "conductivityMax" },
-  tds: { max: "tdsMax" },
-  flueGasTemperature: { max: "flueGasTempMax" },
-  o2: { min: "o2Min", max: "o2Max" },
-  co: { max: "coMax" },
-  fuelPressure: { min: "gasPressureMin", max: "gasPressureMax" },
+  conductivityUsCm: { max: "conductivityMaxUsCm" },
+  tdsPpm: { max: "tdsMaxPpm" },
+  flueGasTemperatureC: { max: "stackTemperatureMaxC" },
+  o2Percent: { min: "o2MinPercent", max: "o2MaxPercent" },
+  coPpm: { max: "coMaxPpm" },
+  fuelPressureValue: { min: "gasPressureMin", max: "gasPressureMax" },
   airPressure: { min: "airPressureMin", max: "airPressureMax" },
 };
 
-function bandForMetric(records: OperatingLimitsRecord[], metricKey: string): MetricLimitBand {
+function bandForMetric(records: OperatingLimitsShape[], metricKey: string): MetricLimitBand {
   const mapping = METRIC_LIMIT_MAP[metricKey];
   if (!mapping) return {};
 
@@ -58,7 +63,7 @@ function bandForMetric(records: OperatingLimitsRecord[], metricKey: string): Met
 }
 
 export function buildChartLimits(
-  records: OperatingLimitsRecord[]
+  records: OperatingLimitsShape[]
 ): Record<string, MetricLimitBand> {
   const result: Record<string, MetricLimitBand> = {};
   for (const metricKey of Object.keys(METRIC_LIMIT_MAP)) {
@@ -76,4 +81,34 @@ export function limitsDescription(boilerCount: number, singleName?: string): str
     return `Bandas de referencia según límites operativos de ${singleName}.`;
   }
   return `Bandas de referencia (rango combinado de ${boilerCount} calderas con límites configurados).`;
+}
+
+export function getLimitBand(
+  metricKey: string,
+  limits: OperatingLimitsShape | null | undefined
+): LimitBand | null {
+  if (!limits) return null;
+  const mapping = METRIC_LIMIT_MAP[metricKey];
+  if (!mapping) return null;
+
+  const band: LimitBand = {};
+  if (mapping.min) {
+    const v = limits[mapping.min];
+    if (v != null) band.min = v;
+  }
+  if (mapping.max) {
+    const v = limits[mapping.max];
+    if (v != null) band.max = v;
+  }
+  if (band.min == null && band.max == null) return null;
+  return band;
+}
+
+export function getAllLimitBands(limits: OperatingLimitsShape | null | undefined) {
+  const result: Record<string, LimitBand> = {};
+  for (const key of Object.keys(METRIC_LIMIT_MAP)) {
+    const band = getLimitBand(key, limits);
+    if (band) result[key] = band;
+  }
+  return result;
 }

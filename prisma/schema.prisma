@@ -30,11 +30,17 @@ enum CompanyStatus {
   DELETED
 }
 
+enum PlantStatus {
+  ACTIVE
+  DISABLED
+}
+
 enum BoilerType {
   TUBOS_HUMO
   ACUOTUBULAR
   AGUA_CALIENTE
   ACEITE_TERMICO
+  MIXTA
   OTRO
 }
 
@@ -44,7 +50,19 @@ enum FuelType {
   DIESEL
   COMBUSTOLEO
   DUAL
+  BIOMASA
   OTRO
+}
+
+enum FuelPressureUnit {
+  IN_H2O
+  KG_CM2
+}
+
+enum FuelConsumptionUnit {
+  M3N
+  L
+  KG
 }
 
 enum BoilerStatus {
@@ -142,6 +160,7 @@ model Company {
   id        String        @id @default(cuid())
   name      String
   status    CompanyStatus @default(ACTIVE)
+  logoUrl   String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   deletedAt DateTime?
@@ -182,43 +201,59 @@ model User {
 }
 
 model Plant {
-  id        String   @id @default(cuid())
-  name      String
-  client    String
-  location  String?
-  companyId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String      @id @default(cuid())
+  name           String
+  normalizedName String
+  client         String?
+  location       String?
+  address        String?
+  contact        String?
+  phone          String?
+  email          String?
+  notes          String?
+  companyId      String?
+  status         PlantStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
 
   company Company? @relation(fields: [companyId], references: [id])
   boilers Boiler[]
+
+  @@unique([companyId, normalizedName])
+  @@index([companyId])
 }
 
 model Boiler {
-  id                   String       @id @default(cuid())
-  internalId           String       @unique
-  name                 String
-  brand                String?
-  model                String?
-  serialNumber         String?
-  capacityHp           Float?
-  capacityKgH          Float?
-  capacityLbH          Float?
-  type                 BoilerType
-  fuelType             FuelType
-  designPressure       Float?
-  operatingPressure    Float?
-  operatingTemperature Float?
-  location             String?
-  installationDate     DateTime?
-  lastInspectionDate   DateTime?
-  nextInspectionDate   DateTime?
-  status               BoilerStatus @default(OPERANDO)
-  technicalNotes       String?
-  plantId              String?
-  companyId            String?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  id                              String       @id @default(cuid())
+  internalId                      String
+  name                            String
+  brand                           String?
+  model                           String?
+  serialNumber                    String?
+  capacityHp                      Float?
+  capacityKgH                     Float?
+  capacityLbH                     Float?
+  type                            BoilerType
+  customType                      String?
+  fuelType                        FuelType
+  customFuelType                  String?
+  designPressureKgCm2             Float?
+  designPressureNotApplicable     Boolean      @default(false)
+  operatingPressureKgCm2          Float?
+  operatingPressureNotApplicable  Boolean      @default(false)
+  operatingTemperatureC           Float?
+  operatingTemperatureNotApplicable Boolean    @default(false)
+  location                        String?
+  installationDate                DateTime?
+  lastInspectionDate              DateTime?
+  nextInspectionDate              DateTime?
+  status                          BoilerStatus @default(OPERANDO)
+  technicalNotes                  String?
+  plantId                         String?
+  companyId                       String?
+  createdAt                       DateTime     @default(now())
+  updatedAt                       DateTime     @updatedAt
 
   company           Company?              @relation(fields: [companyId], references: [id])
   plant             Plant?                @relation(fields: [plantId], references: [id])
@@ -227,33 +262,34 @@ model Boiler {
   alerts            Alert[]
   maintenanceOrders MaintenanceOrder[]
 
+  @@unique([companyId, internalId])
   @@index([companyId])
 }
 
 model BoilerOperatingLimit {
-  id               String   @id @default(cuid())
-  boilerId         String   @unique
-  pressureMin      Float?
-  pressureMax      Float?
-  temperatureMin   Float?
-  temperatureMax   Float?
-  waterLevelMin    Float?
-  waterLevelMax    Float?
-  conductivityMax  Float?
-  tdsMax           Float?
-  phMin            Float?
-  phMax            Float?
-  hardnessMax      Float?
-  o2Min            Float?
-  o2Max            Float?
-  coMax            Float?
-  flueGasTempMax    Float?
-  gasPressureMin   Float?
-  gasPressureMax   Float?
-  airPressureMin   Float?
-  airPressureMax   Float?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  boilerId              String   @unique
+  pressureMinKgCm2      Float?
+  pressureMaxKgCm2      Float?
+  temperatureMinC       Float?
+  temperatureMaxC       Float?
+  waterLevelMinPercent  Float?
+  waterLevelMaxPercent  Float?
+  conductivityMaxUsCm   Float?
+  tdsMaxPpm             Float?
+  phMin                 Float?
+  phMax                 Float?
+  hardnessMaxPpm        Float?
+  o2MinPercent          Float?
+  o2MaxPercent          Float?
+  coMaxPpm              Float?
+  stackTemperatureMaxC  Float?
+  gasPressureMin        Float?
+  gasPressureMax        Float?
+  airPressureMin        Float?
+  airPressureMax        Float?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   boiler Boiler @relation(fields: [boilerId], references: [id], onDelete: Cascade)
 }
@@ -269,18 +305,24 @@ model BoilerLog {
   loadLevel                 LoadLevel?
   loadPercentage            Float?
   operationalState          LogOperationalState @default(NORMAL)
-  steamPressure             Float?
-  steamTemperature          Float?
-  feedwaterPressure         Float?
-  feedwaterTemperature      Float?
-  condensateReturnTemp      Float?
-  waterLevel                Float?
+  steamPressureKgCm2        Float?
+  steamTemperatureC         Float?
+  feedwaterPressureKgCm2    Float?
+  feedwaterTemperatureC     Float?
+  condensateReturnTemperatureC Float?
+  waterLevelPercent         Float?
   feedPumpStatus            String?
   alternatePumpStatus       String?
-  fuelPressure              Float?
+  feedPumpPressureKgCm2     Float?
+  alternatePumpPressureKgCm2 Float?
+  fuelPressureValue         Float?
+  fuelPressureUnit          FuelPressureUnit?
+  operatingFuelType         String?
   airPressure               Float?
-  fanFrequency              Float?
-  modulationPosition        Float?
+  fanFrequencyHz            Float?
+  modulationPositionDegrees Float?
+  fuelConsumptionValue      Float?
+  fuelConsumptionUnit       FuelConsumptionUnit?
   generalObservations       String?
   abnormalCondition         String?
   immediateCorrectiveAction String?
@@ -317,14 +359,13 @@ model BoilerLog {
 model BoilerLogCombustion {
   id                  String  @id @default(cuid())
   boilerLogId         String  @unique
-  flueGasTemperature  Float?
-  o2                  Float?
-  co                  Float?
-  co2                 Float?
-  excessAir           Float?
-  estimatedEfficiency Float?
-  fuelConsumption     Float?
-  steamFlow           Float?
+  flueGasTemperatureC Float?
+  o2Percent           Float?
+  coPpm               Float?
+  co2Percent          Float?
+  excessAirPercent    Float?
+  estimatedEfficiencyPercent Float?
+  steamFlowKgH        Float?
 
   boilerLog BoilerLog @relation(fields: [boilerLogId], references: [id], onDelete: Cascade)
 }
@@ -333,13 +374,14 @@ model BoilerLogWaterTreatment {
   id                  String  @id @default(cuid())
   boilerLogId         String  @unique
   ph                  Float?
-  conductivity        Float?
-  tds                 Float?
-  hardness            Float?
-  sulfites            Float?
-  phosphates          Float?
-  alkalinity          Float?
-  chlorides           Float?
+  conductivityUsCm    Float?
+  tdsPpm              Float?
+  tdsConversionFactor Float?
+  hardnessPpmAsCaCO3  Float?
+  sulfitesPpm         Float?
+  phosphatesPpm       Float?
+  alkalinityPpmAsCaCO3 Float?
+  chloridesPpm        Float?
   bottomBlowdownDone  Boolean @default(false)
   surfaceBlowdownDone Boolean @default(false)
   softenerInService   Boolean @default(false)

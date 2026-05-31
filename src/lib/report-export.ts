@@ -49,9 +49,9 @@ function buildSheets(data: Record<string, unknown>): ExportSheet[] {
           formatDate(l.logDate as string, true),
           boiler.name,
           l.shift as string,
-          l.steamPressure as number | null,
-          l.steamTemperature as number | null,
-          l.waterLevel as number | null,
+          l.steamPressureKgCm2 as number | null,
+          l.steamTemperatureC as number | null,
+          l.waterLevelPercent as number | null,
           operator.username,
           LOG_STATUS_LABELS[l.status as string] || (l.status as string),
         ];
@@ -143,8 +143,8 @@ function buildSheets(data: Record<string, unknown>): ExportSheet[] {
           formatDate(l.logDate as string, true),
           boiler.name,
           l.shift as string,
-          l.steamPressure as number | null,
-          l.waterLevel as number | null,
+          l.steamPressureKgCm2 as number | null,
+          l.waterLevelPercent as number | null,
           operator.username,
           LOG_STATUS_LABELS[l.status as string] || (l.status as string),
         ];

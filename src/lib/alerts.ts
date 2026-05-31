@@ -9,38 +9,47 @@ export interface AlertInput {
 }
 
 export interface LogAlertContext {
-  steamPressure?: number | null;
-  steamTemperature?: number | null;
-  waterLevel?: number | null;
+  steamPressureKgCm2?: number | null;
+  steamTemperatureC?: number | null;
+  waterLevelPercent?: number | null;
   ph?: number | null;
-  conductivity?: number | null;
-  o2?: number | null;
-  co?: number | null;
-  flueGasTemperature?: number | null;
+  conductivityUsCm?: number | null;
+  tdsPpm?: number | null;
+  o2Percent?: number | null;
+  coPpm?: number | null;
+  flueGasTemperatureC?: number | null;
+  fuelPressureValue?: number | null;
+  fuelPressureUnit?: string | null;
   requiresMaintenance?: boolean;
   maintenancePriority?: MaintenancePriority | null;
   safetyChecklist?: { itemKey: string; response: string }[];
 }
 
 export interface OperatingLimits {
-  pressureMin?: number | null;
-  pressureMax?: number | null;
-  temperatureMin?: number | null;
-  temperatureMax?: number | null;
-  waterLevelMin?: number | null;
-  conductivityMax?: number | null;
+  pressureMinKgCm2?: number | null;
+  pressureMaxKgCm2?: number | null;
+  temperatureMinC?: number | null;
+  temperatureMaxC?: number | null;
+  waterLevelMinPercent?: number | null;
+  waterLevelMaxPercent?: number | null;
+  conductivityMaxUsCm?: number | null;
+  tdsMaxPpm?: number | null;
   phMin?: number | null;
   phMax?: number | null;
-  o2Min?: number | null;
-  o2Max?: number | null;
-  coMax?: number | null;
-  flueGasTempMax?: number | null;
+  o2MinPercent?: number | null;
+  o2MaxPercent?: number | null;
+  coMaxPpm?: number | null;
+  stackTemperatureMaxC?: number | null;
 }
 
 function outOfRange(value: number, min?: number | null, max?: number | null): boolean {
   if (min != null && value < min) return true;
   if (max != null && value > max) return true;
   return false;
+}
+
+function hasLimit(min?: number | null, max?: number | null): boolean {
+  return min != null || max != null;
 }
 
 export function evaluateAlerts(
@@ -50,34 +59,63 @@ export function evaluateAlerts(
   const alerts: AlertInput[] = [];
   if (!limits) return alerts;
 
-  if (ctx.steamPressure != null && outOfRange(ctx.steamPressure, limits.pressureMin, limits.pressureMax)) {
+  if (
+    ctx.steamPressureKgCm2 != null &&
+    hasLimit(limits.pressureMinKgCm2, limits.pressureMaxKgCm2) &&
+    outOfRange(ctx.steamPressureKgCm2, limits.pressureMinKgCm2, limits.pressureMaxKgCm2)
+  ) {
     alerts.push({
-      parameter: "Presión de vapor",
-      recordedValue: String(ctx.steamPressure),
-      configuredLimit: `${limits.pressureMin ?? "—"} - ${limits.pressureMax ?? "—"}`,
+      parameter: "Presión de vapor (kg/cm²)",
+      recordedValue: `${ctx.steamPressureKgCm2} kg/cm²`,
+      configuredLimit: `${limits.pressureMinKgCm2 ?? "—"} - ${limits.pressureMaxKgCm2 ?? "—"} kg/cm²`,
       severity: "CRITICO",
     });
   }
 
-  if (ctx.steamTemperature != null && outOfRange(ctx.steamTemperature, limits.temperatureMin, limits.temperatureMax)) {
+  if (
+    ctx.steamTemperatureC != null &&
+    hasLimit(limits.temperatureMinC, limits.temperatureMaxC) &&
+    outOfRange(ctx.steamTemperatureC, limits.temperatureMinC, limits.temperatureMaxC)
+  ) {
     alerts.push({
-      parameter: "Temperatura de vapor",
-      recordedValue: String(ctx.steamTemperature),
-      configuredLimit: `${limits.temperatureMin ?? "—"} - ${limits.temperatureMax ?? "—"}`,
+      parameter: "Temperatura de vapor (°C)",
+      recordedValue: `${ctx.steamTemperatureC} °C`,
+      configuredLimit: `${limits.temperatureMinC ?? "—"} - ${limits.temperatureMaxC ?? "—"} °C`,
       severity: "CRITICO",
     });
   }
 
-  if (ctx.conductivity != null && limits.conductivityMax != null && ctx.conductivity > limits.conductivityMax) {
+  if (
+    ctx.conductivityUsCm != null &&
+    limits.conductivityMaxUsCm != null &&
+    ctx.conductivityUsCm > limits.conductivityMaxUsCm
+  ) {
     alerts.push({
-      parameter: "Conductividad",
-      recordedValue: String(ctx.conductivity),
-      configuredLimit: `Máx: ${limits.conductivityMax}`,
+      parameter: "Conductividad (μS/cm)",
+      recordedValue: `${ctx.conductivityUsCm} μS/cm`,
+      configuredLimit: `Máx: ${limits.conductivityMaxUsCm} μS/cm`,
       severity: "ADVERTENCIA",
     });
   }
 
-  if (ctx.ph != null && outOfRange(ctx.ph, limits.phMin, limits.phMax)) {
+  if (
+    ctx.tdsPpm != null &&
+    limits.tdsMaxPpm != null &&
+    ctx.tdsPpm > limits.tdsMaxPpm
+  ) {
+    alerts.push({
+      parameter: "TDS (ppm)",
+      recordedValue: `${ctx.tdsPpm} ppm`,
+      configuredLimit: `Máx: ${limits.tdsMaxPpm} ppm`,
+      severity: "ADVERTENCIA",
+    });
+  }
+
+  if (
+    ctx.ph != null &&
+    hasLimit(limits.phMin, limits.phMax) &&
+    outOfRange(ctx.ph, limits.phMin, limits.phMax)
+  ) {
     alerts.push({
       parameter: "pH",
       recordedValue: String(ctx.ph),
@@ -86,39 +124,64 @@ export function evaluateAlerts(
     });
   }
 
-  if (ctx.o2 != null && outOfRange(ctx.o2, limits.o2Min, limits.o2Max)) {
+  if (
+    ctx.o2Percent != null &&
+    hasLimit(limits.o2MinPercent, limits.o2MaxPercent) &&
+    outOfRange(ctx.o2Percent, limits.o2MinPercent, limits.o2MaxPercent)
+  ) {
     alerts.push({
-      parameter: "O2",
-      recordedValue: String(ctx.o2),
-      configuredLimit: `${limits.o2Min ?? "—"} - ${limits.o2Max ?? "—"}`,
+      parameter: "O₂ (%)",
+      recordedValue: `${ctx.o2Percent} %`,
+      configuredLimit: `${limits.o2MinPercent ?? "—"} - ${limits.o2MaxPercent ?? "—"} %`,
       severity: "ADVERTENCIA",
     });
   }
 
-  if (ctx.co != null && limits.coMax != null && ctx.co > limits.coMax) {
+  if (ctx.coPpm != null && limits.coMaxPpm != null && ctx.coPpm > limits.coMaxPpm) {
     alerts.push({
-      parameter: "CO",
-      recordedValue: String(ctx.co),
-      configuredLimit: `Máx: ${limits.coMax}`,
+      parameter: "CO (ppm)",
+      recordedValue: `${ctx.coPpm} ppm`,
+      configuredLimit: `Máx: ${limits.coMaxPpm} ppm`,
       severity: "CRITICO",
     });
   }
 
-  if (ctx.flueGasTemperature != null && limits.flueGasTempMax != null && ctx.flueGasTemperature > limits.flueGasTempMax) {
+  if (
+    ctx.flueGasTemperatureC != null &&
+    limits.stackTemperatureMaxC != null &&
+    ctx.flueGasTemperatureC > limits.stackTemperatureMaxC
+  ) {
     alerts.push({
-      parameter: "Temperatura de gases",
-      recordedValue: String(ctx.flueGasTemperature),
-      configuredLimit: `Máx: ${limits.flueGasTempMax}`,
+      parameter: "Temperatura de gases (°C)",
+      recordedValue: `${ctx.flueGasTemperatureC} °C`,
+      configuredLimit: `Máx: ${limits.stackTemperatureMaxC} °C`,
       severity: "ADVERTENCIA",
     });
   }
 
-  if (ctx.waterLevel != null && limits.waterLevelMin != null && ctx.waterLevel < limits.waterLevelMin) {
+  if (
+    ctx.waterLevelPercent != null &&
+    limits.waterLevelMinPercent != null &&
+    ctx.waterLevelPercent < limits.waterLevelMinPercent
+  ) {
     alerts.push({
-      parameter: "Nivel de agua",
-      recordedValue: String(ctx.waterLevel),
-      configuredLimit: `Mín: ${limits.waterLevelMin}`,
+      parameter: "Nivel de agua (%)",
+      recordedValue: `${ctx.waterLevelPercent} %`,
+      configuredLimit: `Mín: ${limits.waterLevelMinPercent} %`,
       severity: "CRITICO",
+    });
+  }
+
+  if (
+    ctx.waterLevelPercent != null &&
+    limits.waterLevelMaxPercent != null &&
+    ctx.waterLevelPercent > limits.waterLevelMaxPercent
+  ) {
+    alerts.push({
+      parameter: "Nivel de agua (%)",
+      recordedValue: `${ctx.waterLevelPercent} %`,
+      configuredLimit: `Máx: ${limits.waterLevelMaxPercent} %`,
+      severity: "ADVERTENCIA",
     });
   }
 
@@ -155,16 +218,16 @@ export function isLogCompleteForApproval(log: {
   boilerId: string;
   operatorId: string;
   shift: string;
-  steamPressure: number | null;
-  waterLevel: number | null;
+  steamPressureKgCm2: number | null;
+  waterLevelPercent: number | null;
   safetyChecklist: { response: string }[];
 }): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!log.boilerId) errors.push("Caldera requerida");
   if (!log.operatorId) errors.push("Operador requerido");
   if (!log.shift) errors.push("Turno requerido");
-  if (log.steamPressure == null) errors.push("Presión de vapor requerida");
-  if (log.waterLevel == null) errors.push("Nivel de agua requerido");
+  if (log.steamPressureKgCm2 == null) errors.push("Presión de vapor requerida");
+  if (log.waterLevelPercent == null) errors.push("Nivel de agua requerido");
   if (log.safetyChecklist.length === 0) errors.push("Checklist de seguridad incompleto");
   return { valid: errors.length === 0, errors };
 }
