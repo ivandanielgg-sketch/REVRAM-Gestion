@@ -5,16 +5,12 @@ import Link from "next/link";
 import { PageHeader, LoadingState } from "@/components/ui/Common";
 import { Card, StatCard, Badge } from "@/components/ui/Card";
 import { formatDate } from "@/lib/utils";
-import {
-  LOG_STATUS_LABELS,
-  ALERT_SEVERITY_LABELS,
-  SEVERITY_COLORS,
-  STATUS_COLORS,
-} from "@/lib/constants";
+import { LOG_STATUS_LABELS, ALERT_SEVERITY_LABELS, SEVERITY_COLORS, STATUS_COLORS, BRAND_TITLE } from "@/lib/constants";
 import { ClipboardList, History, BarChart3, Wrench, Settings } from "lucide-react";
 
 interface DashboardData {
   boilers: { id: string; name: string; status: string; internalId: string }[];
+  company?: { logoUrl: string | null; name: string } | null;
   stats: {
     totalBoilers: number;
     boilersOperating: number;
@@ -63,6 +59,15 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Resumen operativo de calderas y bitácoras"
       />
+
+      {data.company?.logoUrl ? (
+        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={data.company.logoUrl} alt={data.company.name} className="max-h-14 object-contain" />
+        </div>
+      ) : (
+        <p className="mb-6 text-sm font-medium text-slate-700">{BRAND_TITLE}</p>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Calderas registradas" value={data.stats.totalBoilers} />

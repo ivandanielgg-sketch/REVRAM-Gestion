@@ -6,10 +6,43 @@ import { PageHeader } from "@/components/ui/Common";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select, Textarea } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { BOILER_TYPE_LABELS, FUEL_TYPE_LABELS } from "@/lib/constants";
+
+function NotApplicableField({
+  label,
+  name,
+  naName,
+  defaultNa = false,
+}: {
+  label: string;
+  name: string;
+  naName: string;
+  defaultNa?: boolean;
+}) {
+  const [na, setNa] = useState(defaultNa);
+  return (
+    <div>
+      <Label htmlFor={name}>{label}</Label>
+      <Input id={name} name={name} type="number" step="any" disabled={na} />
+      <label className="mt-1 flex items-center gap-2 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          name={naName}
+          value="true"
+          checked={na}
+          onChange={(e) => setNa(e.target.checked)}
+        />
+        No aplica
+      </label>
+    </div>
+  );
+}
 
 export default function NewBoilerPage() {
   const router = useRouter();
   const [plants, setPlants] = useState<{ id: string; name: string }[]>([]);
+  const [type, setType] = useState("ACUOTUBULAR");
+  const [fuelType, setFuelType] = useState("GAS_NATURAL");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +57,10 @@ export default function NewBoilerPage() {
     setLoading(true);
     setError("");
     const form = new FormData(e.currentTarget);
-    const body = Object.fromEntries(form.entries());
+    const body: Record<string, unknown> = Object.fromEntries(form.entries());
+    for (const key of ["designPressureNotApplicable", "operatingPressureNotApplicable", "operatingTemperatureNotApplicable"]) {
+      body[key] = form.get(key) === "true";
+    }
     const res = await fetch("/api/boilers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -70,33 +106,38 @@ export default function NewBoilerPage() {
               <Select id="plantId" name="plantId">
                 <option value="">— Seleccionar —</option>
                 {plants.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </Select>
             </div>
             <div>
               <Label htmlFor="type">Tipo *</Label>
-              <Select id="type" name="type" required defaultValue="ACUOTUBULAR">
-                <option value="TUBOS_HUMO">Tubos de humo</option>
-                <option value="ACUOTUBULAR">Acuotubular</option>
-                <option value="AGUA_CALIENTE">Agua caliente</option>
-                <option value="ACEITE_TERMICO">Aceite térmico</option>
-                <option value="OTRO">Otro</option>
+              <Select id="type" name="type" required value={type} onChange={(e) => setType(e.target.value)}>
+                {Object.entries(BOILER_TYPE_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
               </Select>
             </div>
+            {type === "OTRO" && (
+              <div>
+                <Label htmlFor="customType">Especificar tipo de equipo *</Label>
+                <Input id="customType" name="customType" required />
+              </div>
+            )}
             <div>
-              <Label htmlFor="fuelType">Combustible *</Label>
-              <Select id="fuelType" name="fuelType" required defaultValue="GAS_NATURAL">
-                <option value="GAS_NATURAL">Gas natural</option>
-                <option value="GAS_LP">Gas LP</option>
-                <option value="DIESEL">Diésel</option>
-                <option value="COMBUSTOLEO">Combustóleo</option>
-                <option value="DUAL">Dual</option>
-                <option value="OTRO">Otro</option>
+              <Label htmlFor="fuelType">Tipo de combustible *</Label>
+              <Select id="fuelType" name="fuelType" required value={fuelType} onChange={(e) => setFuelType(e.target.value)}>
+                {Object.entries(FUEL_TYPE_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
               </Select>
             </div>
+            {fuelType === "OTRO" && (
+              <div>
+                <Label htmlFor="customFuelType">Especificar combustible *</Label>
+                <Input id="customFuelType" name="customFuelType" required />
+              </div>
+            )}
             <div>
               <Label htmlFor="capacityHp">Capacidad (HP)</Label>
               <Input id="capacityHp" name="capacityHp" type="number" step="any" />
@@ -105,18 +146,9 @@ export default function NewBoilerPage() {
               <Label htmlFor="capacityKgH">Capacidad (kg/h)</Label>
               <Input id="capacityKgH" name="capacityKgH" type="number" step="any" />
             </div>
-            <div>
-              <Label htmlFor="designPressure">Presión de diseño</Label>
-              <Input id="designPressure" name="designPressure" type="number" step="any" />
-            </div>
-            <div>
-              <Label htmlFor="operatingPressure">Presión de operación</Label>
-              <Input id="operatingPressure" name="operatingPressure" type="number" step="any" />
-            </div>
-            <div>
-              <Label htmlFor="operatingTemperature">Temperatura de operación</Label>
-              <Input id="operatingTemperature" name="operatingTemperature" type="number" step="any" />
-            </div>
+            <NotApplicableField label="Presión de diseño (kg/cm²)" name="designPressureKgCm2" naName="designPressureNotApplicable" />
+            <NotApplicableField label="Presión de operación (kg/cm²)" name="operatingPressureKgCm2" naName="operatingPressureNotApplicable" />
+            <NotApplicableField label="Temperatura de operación (°C)" name="operatingTemperatureC" naName="operatingTemperatureNotApplicable" />
             <div>
               <Label htmlFor="location">Ubicación</Label>
               <Input id="location" name="location" />
@@ -138,12 +170,8 @@ export default function NewBoilerPage() {
         </Card>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex gap-3">
-          <Button type="submit" disabled={loading}>
-            Guardar caldera
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => router.back()}>
-            Cancelar
-          </Button>
+          <Button type="submit" disabled={loading}>{loading ? "Guardando..." : "Guardar caldera"}</Button>
+          <Button type="button" variant="secondary" onClick={() => router.back()}>Cancelar</Button>
         </div>
       </form>
     </div>

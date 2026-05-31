@@ -4,6 +4,7 @@ import { requireAnyPermission } from "@/lib/api-auth";
 import { userSchema } from "@/lib/validations/schemas";
 import { hashPassword } from "@/lib/auth";
 import { assertCompanyAccess, isSuperAdmin } from "@/lib/tenant";
+import { assertRoleAssignableBySession } from "@/lib/security";
 
 export async function PUT(
   request: NextRequest,
@@ -33,7 +34,16 @@ export async function PUT(
   if (parsed.data.username !== undefined) data.username = parsed.data.username;
   if (parsed.data.email !== undefined) data.email = parsed.data.email;
   if (parsed.data.name !== undefined) data.name = parsed.data.name;
-  if (parsed.data.role !== undefined) data.role = parsed.data.role;
+  if (parsed.data.role !== undefined) {
+    const roleCheck = assertRoleAssignableBySession(session, parsed.data.role);
+    if (!roleCheck.ok) {
+      return NextResponse.json({ error: roleCheck.error }, { status: 403 });
+    }
+    if (parsed.data.role === "SUPER_ADMIN" && target.id !== session.id && !isSuperAdmin(session.role)) {
+      return NextResponse.json({ error: "No puede asignar rol SUPER_ADMIN" }, { status: 403 });
+    }
+    data.role = parsed.data.role;
+  }
   if (parsed.data.status !== undefined) data.status = parsed.data.status;
   if (parsed.data.companyId !== undefined && isSuperAdmin(session.role)) {
     data.companyId = parsed.data.companyId;

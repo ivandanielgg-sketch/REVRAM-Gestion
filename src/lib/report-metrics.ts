@@ -9,26 +9,26 @@ export interface TrendMetric {
 }
 
 export const TREND_METRICS: TrendMetric[] = [
-  { key: "steamPressure", label: "Presión de vapor", unit: "psi", color: "#334155", group: "vapor" },
-  { key: "steamTemperature", label: "Temperatura de vapor", unit: "°C", color: "#475569", group: "vapor" },
-  { key: "waterLevel", label: "Nivel de agua", unit: "%", color: "#0284c7", group: "agua" },
-  { key: "feedwaterPressure", label: "Presión agua alimentación", unit: "psi", color: "#0369a1", group: "agua" },
-  { key: "feedwaterTemperature", label: "Temp. agua alimentación", unit: "°C", color: "#0ea5e9", group: "agua" },
-  { key: "condensateReturnTemp", label: "Temp. retorno condensado", unit: "°C", color: "#38bdf8", group: "agua" },
-  { key: "flueGasTemperature", label: "Temp. gases de chimenea", unit: "°C", color: "#dc2626", group: "combustion" },
-  { key: "o2", label: "O₂", unit: "%", color: "#2563eb", group: "combustion" },
-  { key: "co", label: "CO", unit: "ppm", color: "#ca8a04", group: "combustion" },
-  { key: "co2", label: "CO₂", unit: "%", color: "#ea580c", group: "combustion" },
-  { key: "excessAir", label: "Aire en exceso", unit: "%", color: "#f97316", group: "combustion" },
-  { key: "estimatedEfficiency", label: "Eficiencia estimada", unit: "%", color: "#b45309", group: "combustion" },
+  { key: "steamPressureKgCm2", label: "Presión de vapor", unit: "kg/cm²", color: "#334155", group: "vapor" },
+  { key: "steamTemperatureC", label: "Temperatura de vapor", unit: "°C", color: "#475569", group: "vapor" },
+  { key: "waterLevelPercent", label: "Nivel de agua", unit: "%", color: "#0284c7", group: "agua" },
+  { key: "feedwaterPressureKgCm2", label: "Presión agua alimentación", unit: "kg/cm²", color: "#0369a1", group: "agua" },
+  { key: "feedwaterTemperatureC", label: "Temp. agua alimentación", unit: "°C", color: "#0ea5e9", group: "agua" },
+  { key: "condensateReturnTemperatureC", label: "Temp. retorno condensado", unit: "°C", color: "#38bdf8", group: "agua" },
+  { key: "flueGasTemperatureC", label: "Temp. gases de chimenea", unit: "°C", color: "#dc2626", group: "combustion" },
+  { key: "o2Percent", label: "O₂", unit: "%", color: "#2563eb", group: "combustion" },
+  { key: "coPpm", label: "CO", unit: "ppm", color: "#ca8a04", group: "combustion" },
+  { key: "co2Percent", label: "CO₂", unit: "%", color: "#ea580c", group: "combustion" },
+  { key: "excessAirPercent", label: "Aire en exceso", unit: "%", color: "#f97316", group: "combustion" },
+  { key: "estimatedEfficiencyPercent", label: "Eficiencia estimada", unit: "%", color: "#b45309", group: "combustion" },
   { key: "ph", label: "pH", color: "#059669", group: "tratamiento" },
-  { key: "conductivity", label: "Conductividad", unit: "µS/cm", color: "#7c3aed", group: "tratamiento" },
-  { key: "tds", label: "TDS", unit: "ppm", color: "#9333ea", group: "tratamiento" },
-  { key: "hardness", label: "Dureza", unit: "ppm", color: "#a855f7", group: "tratamiento" },
+  { key: "conductivityUsCm", label: "Conductividad", unit: "μS/cm", color: "#7c3aed", group: "tratamiento" },
+  { key: "tdsPpm", label: "TDS", unit: "ppm", color: "#9333ea", group: "tratamiento" },
+  { key: "hardnessPpmAsCaCO3", label: "Dureza", unit: "ppm CaCO₃", color: "#a855f7", group: "tratamiento" },
   { key: "loadPercentage", label: "Carga", unit: "%", color: "#64748b", group: "operacion" },
-  { key: "fuelPressure", label: "Presión combustible", unit: "psi", color: "#78716c", group: "operacion" },
-  { key: "airPressure", label: "Presión de aire", unit: "psi", color: "#57534e", group: "operacion" },
-  { key: "fanFrequency", label: "Frecuencia ventilador", unit: "Hz", color: "#44403c", group: "operacion" },
+  { key: "fuelPressureValue", label: "Presión combustible", unit: "var.", color: "#78716c", group: "operacion" },
+  { key: "airPressure", label: "Presión de aire", unit: "kg/cm²", color: "#57534e", group: "operacion" },
+  { key: "fanFrequencyHz", label: "Frecuencia ventilador", unit: "Hz", color: "#44403c", group: "operacion" },
 ];
 
 export const TREND_GROUP_LABELS: Record<TrendMetric["group"], string> = {
@@ -40,7 +40,7 @@ export const TREND_GROUP_LABELS: Record<TrendMetric["group"], string> = {
 };
 
 export const STANDARD_BOILER_METRICS: TrendMetric[] = TREND_METRICS.filter((m) =>
-  ["steamPressure", "steamTemperature", "waterLevel", "flueGasTemperature", "ph", "conductivity"].includes(m.key)
+  ["steamPressureKgCm2", "steamTemperatureC", "waterLevelPercent", "flueGasTemperatureC", "ph", "conductivityUsCm"].includes(m.key)
 );
 
 export const PERIOD_LABELS: Record<TrendPeriod, string> = {
@@ -89,29 +89,30 @@ export function resolveDateRange(
 
 interface LogRow {
   logDate: Date | string;
-  steamPressure?: number | null;
-  steamTemperature?: number | null;
-  feedwaterPressure?: number | null;
-  feedwaterTemperature?: number | null;
-  condensateReturnTemp?: number | null;
-  waterLevel?: number | null;
+  steamPressureKgCm2?: number | null;
+  steamTemperatureC?: number | null;
+  feedwaterPressureKgCm2?: number | null;
+  feedwaterTemperatureC?: number | null;
+  condensateReturnTemperatureC?: number | null;
+  waterLevelPercent?: number | null;
   loadPercentage?: number | null;
-  fuelPressure?: number | null;
+  fuelPressureValue?: number | null;
   airPressure?: number | null;
-  fanFrequency?: number | null;
+  fanFrequencyHz?: number | null;
   combustion?: {
-    flueGasTemperature?: number | null;
-    o2?: number | null;
-    co?: number | null;
-    co2?: number | null;
-    excessAir?: number | null;
-    estimatedEfficiency?: number | null;
+    flueGasTemperatureC?: number | null;
+    o2Percent?: number | null;
+    coPpm?: number | null;
+    co2Percent?: number | null;
+    excessAirPercent?: number | null;
+    estimatedEfficiencyPercent?: number | null;
+    steamFlowKgH?: number | null;
   } | null;
   waterTreatment?: {
     ph?: number | null;
-    conductivity?: number | null;
-    tds?: number | null;
-    hardness?: number | null;
+    conductivityUsCm?: number | null;
+    tdsPpm?: number | null;
+    hardnessPpmAsCaCO3?: number | null;
   } | null;
 }
 

@@ -5,7 +5,8 @@ import { userSchema } from "@/lib/validations/schemas";
 import { hashPassword } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/auth";
-import { companyFilter, isSuperAdmin } from "@/lib/tenant";
+import { assertCompanyAccess, companyFilter, isSuperAdmin } from "@/lib/tenant";
+import { assertRoleAssignableBySession, resolveTargetCompanyId } from "@/lib/security";
 
 export async function GET(request: NextRequest) {
   const { error, session } = await requireAnyPermission(request, [
@@ -55,9 +56,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
   }
 
-  const companyId = parsed.data.companyId || session.companyId;
-  if (!companyId && !isSuperAdmin(session.role)) {
+  const companyId = resolveTargetCompanyId(session, parsed.data.companyId);
+  if (!companyId) {
     return NextResponse.json({ error: "Empresa requerida" }, { status: 400 });
+  }
+
+  const roleCheck = assertRoleAssignableBySession(session, parsed.data.role);
+  if (!roleCheck.ok) {
+    return NextResponse.json({ error: roleCheck.error }, { status: 403 });
   }
 
   const passwordHash = await hashPassword(parsed.data.password);

@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/Common";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select, Textarea } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { SAFETY_CHECKLIST_ITEMS } from "@/lib/constants";
+import { SAFETY_CHECKLIST_ITEMS, OPERATING_FUEL_LABELS } from "@/lib/constants";
+import {
+  allowsFuelConsumptionUnitSelection,
+  getDefaultFuelConsumptionUnit,
+  getFuelConsumptionUnitLabel,
+  getFuelPressureUnit,
+  getFuelPressureUnitLabel,
+  resolveOperatingFuel,
+} from "@/lib/units";
+
+interface BoilerOption {
+  id: string;
+  name: string;
+  fuelType: string;
+}
 
 interface ChecklistItem {
   itemKey: string;
@@ -17,9 +31,12 @@ interface ChecklistItem {
 
 export default function NewLogPage() {
   const router = useRouter();
-  const [boilers, setBoilers] = useState<{ id: string; name: string }[]>([]);
-  const [operators, setOperators] = useState<{ id: string; username: string }[]>([]);
+  const [boilers, setBoilers] = useState<BoilerOption[]>([]);
+  const [operators, setOperators] = useState<{ id: string; username: string; role: string }[]>([]);
   const [session, setSession] = useState<{ id: string } | null>(null);
+  const [selectedBoilerId, setSelectedBoilerId] = useState("");
+  const [operatingFuelType, setOperatingFuelType] = useState("");
+  const [fuelConsumptionUnit, setFuelConsumptionUnit] = useState<string>("");
   const [checklist, setChecklist] = useState<ChecklistItem[]>(
     SAFETY_CHECKLIST_ITEMS.map((i) => ({
       itemKey: i.key,
@@ -30,6 +47,22 @@ export default function NewLogPage() {
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const selectedBoiler = useMemo(
+    () => boilers.find((b) => b.id === selectedBoilerId),
+    [boilers, selectedBoilerId]
+  );
+
+  const effectiveFuel = useMemo(() => {
+    if (!selectedBoiler) return "";
+    return resolveOperatingFuel(selectedBoiler.fuelType, operatingFuelType);
+  }, [selectedBoiler, operatingFuelType]);
+
+  const fuelPressureUnit = effectiveFuel ? getFuelPressureUnit(effectiveFuel) : "KG_CM2";
+  const fuelPressureLabel = `Presión de combustible (${getFuelPressureUnitLabel(fuelPressureUnit)})`;
+  const defaultConsumptionUnit = effectiveFuel ? getDefaultFuelConsumptionUnit(effectiveFuel) : "L";
+  const consumptionUnit = fuelConsumptionUnit || defaultConsumptionUnit;
+  const fuelConsumptionLabel = `Consumo de combustible (${getFuelConsumptionUnitLabel(consumptionUnit)})`;
 
   useEffect(() => {
     Promise.all([
@@ -42,6 +75,12 @@ export default function NewLogPage() {
       setSession(s.user);
     });
   }, []);
+
+  useEffect(() => {
+    if (effectiveFuel && effectiveFuel !== "OTRO") {
+      setFuelConsumptionUnit(getDefaultFuelConsumptionUnit(effectiveFuel));
+    }
+  }, [effectiveFuel]);
 
   async function submit(status: string) {
     setLoading(true);
@@ -62,18 +101,25 @@ export default function NewLogPage() {
       loadLevel: fd.get("loadLevel") || null,
       loadPercentage: num("loadPercentage"),
       operationalState: fd.get("operationalState"),
-      steamPressure: num("steamPressure"),
-      steamTemperature: num("steamTemperature"),
-      feedwaterPressure: num("feedwaterPressure"),
-      feedwaterTemperature: num("feedwaterTemperature"),
-      condensateReturnTemp: num("condensateReturnTemp"),
-      waterLevel: num("waterLevel"),
+      steamPressureKgCm2: num("steamPressureKgCm2"),
+      steamTemperatureC: num("steamTemperatureC"),
+      feedwaterPressureKgCm2: num("feedwaterPressureKgCm2"),
+      feedwaterTemperatureC: num("feedwaterTemperatureC"),
+      condensateReturnTemperatureC: num("condensateReturnTemperatureC"),
+      waterLevelPercent: num("waterLevelPercent"),
       feedPumpStatus: fd.get("feedPumpStatus") || undefined,
       alternatePumpStatus: fd.get("alternatePumpStatus") || undefined,
-      fuelPressure: num("fuelPressure"),
+      feedPumpPressureKgCm2: num("feedPumpPressureKgCm2"),
+      alternatePumpPressureKgCm2: num("alternatePumpPressureKgCm2"),
+      fuelPressureValue: num("fuelPressureValue"),
+      fuelPressureUnit: effectiveFuel ? getFuelPressureUnit(effectiveFuel) : null,
+      operatingFuelType: selectedBoiler?.fuelType === "DUAL" ? operatingFuelType : null,
+      fuelConsumptionValue: num("fuelConsumptionValue"),
+      fuelConsumptionUnit: consumptionUnit || null,
+      boilerFuelType: selectedBoiler?.fuelType,
       airPressure: num("airPressure"),
-      fanFrequency: num("fanFrequency"),
-      modulationPosition: num("modulationPosition"),
+      fanFrequencyHz: num("fanFrequencyHz"),
+      modulationPositionDegrees: num("modulationPositionDegrees"),
       generalObservations: fd.get("generalObservations") || undefined,
       abnormalCondition: fd.get("abnormalCondition") || undefined,
       immediateCorrectiveAction: fd.get("immediateCorrectiveAction") || undefined,
@@ -82,24 +128,23 @@ export default function NewLogPage() {
       operatorSignature: fd.get("operatorSignature") || undefined,
       status,
       combustion: {
-        flueGasTemperature: num("flueGasTemperature"),
-        o2: num("o2"),
-        co: num("co"),
-        co2: num("co2"),
-        excessAir: num("excessAir"),
-        estimatedEfficiency: num("estimatedEfficiency"),
-        fuelConsumption: num("fuelConsumption"),
-        steamFlow: num("steamFlow"),
+        flueGasTemperatureC: num("flueGasTemperatureC"),
+        o2Percent: num("o2Percent"),
+        coPpm: num("coPpm"),
+        co2Percent: num("co2Percent"),
+        excessAirPercent: num("excessAirPercent"),
+        estimatedEfficiencyPercent: num("estimatedEfficiencyPercent"),
+        steamFlowKgH: num("steamFlowKgH"),
       },
       waterTreatment: {
         ph: num("ph"),
-        conductivity: num("conductivity"),
-        tds: num("tds"),
-        hardness: num("hardness"),
-        sulfites: num("sulfites"),
-        phosphates: num("phosphates"),
-        alkalinity: num("alkalinity"),
-        chlorides: num("chlorides"),
+        conductivityUsCm: num("conductivityUsCm"),
+        tdsPpm: num("tdsPpm"),
+        hardnessPpmAsCaCO3: num("hardnessPpmAsCaCO3"),
+        sulfitesPpm: num("sulfitesPpm"),
+        phosphatesPpm: num("phosphatesPpm"),
+        alkalinityPpmAsCaCO3: num("alkalinityPpmAsCaCO3"),
+        chloridesPpm: num("chloridesPpm"),
         bottomBlowdownDone: fd.get("bottomBlowdownDone") === "on",
         surfaceBlowdownDone: fd.get("surfaceBlowdownDone") === "on",
         softenerInService: fd.get("softenerInService") === "on",
@@ -139,13 +184,24 @@ export default function NewLogPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <Label>Caldera *</Label>
-              <Select name="boilerId" required>
+              <Select name="boilerId" required value={selectedBoilerId} onChange={(e) => setSelectedBoilerId(e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {boilers.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </Select>
             </div>
+            {selectedBoiler?.fuelType === "DUAL" && (
+              <div>
+                <Label>Combustible en operación *</Label>
+                <Select value={operatingFuelType} onChange={(e) => setOperatingFuelType(e.target.value)} required>
+                  <option value="">— Seleccionar —</option>
+                  {Object.entries(OPERATING_FUEL_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Operador *</Label>
               <Select name="operatorId" required defaultValue={session?.id || ""}>
@@ -164,14 +220,8 @@ export default function NewLogPage() {
                 <option value="PERSONALIZADO">Personalizado</option>
               </Select>
             </div>
-            <div>
-              <Label>Turno personalizado</Label>
-              <Input name="customShift" />
-            </div>
-            <div>
-              <Label>Horas acumuladas</Label>
-              <Input name="accumulatedHours" type="number" step="any" />
-            </div>
+            <div><Label>Turno personalizado</Label><Input name="customShift" /></div>
+            <div><Label>Horas acumuladas</Label><Input name="accumulatedHours" type="number" step="any" /></div>
             <div>
               <Label>Carga estimada</Label>
               <Select name="loadLevel">
@@ -182,10 +232,7 @@ export default function NewLogPage() {
                 <option value="PORCENTAJE_MANUAL">Porcentaje manual</option>
               </Select>
             </div>
-            <div>
-              <Label>% carga manual</Label>
-              <Input name="loadPercentage" type="number" step="any" min={0} max={100} />
-            </div>
+            <div><Label>% carga manual</Label><Input name="loadPercentage" type="number" step="any" min={0} max={100} /></div>
             <div>
               <Label>Estado operativo</Label>
               <Select name="operationalState" defaultValue="NORMAL">
@@ -201,24 +248,22 @@ export default function NewLogPage() {
         <Card title="Parámetros de operación">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["steamPressure", "Presión vapor"],
-              ["steamTemperature", "Temp. vapor"],
-              ["feedwaterPressure", "Presión agua alimentación"],
-              ["feedwaterTemperature", "Temp. agua alimentación"],
-              ["condensateReturnTemp", "Temp. retorno condensados"],
-              ["waterLevel", "Nivel de agua *"],
-              ["fuelPressure", "Presión combustible"],
+              ["steamPressureKgCm2", "Presión de vapor (kg/cm²)"],
+              ["steamTemperatureC", "Temperatura de vapor (°C)"],
+              ["feedwaterPressureKgCm2", "Presión de agua de alimentación (kg/cm²)"],
+              ["feedwaterTemperatureC", "Temperatura de agua de alimentación (°C)"],
+              ["condensateReturnTemperatureC", "Temperatura de retorno de condensados (°C)"],
+              ["waterLevelPercent", "Nivel de agua (%) *"],
               ["airPressure", "Presión aire"],
-              ["fanFrequency", "Frecuencia ventilador/VFD"],
-              ["modulationPosition", "Posición modulación"],
-              ["flueGasTemperature", "Temp. gases chimenea"],
-              ["o2", "O2 (%)"],
-              ["co", "CO (ppm)"],
-              ["co2", "CO2 (%)"],
-              ["excessAir", "Exceso de aire"],
-              ["estimatedEfficiency", "Eficiencia estimada"],
-              ["fuelConsumption", "Consumo combustible"],
-              ["steamFlow", "Flujo de vapor"],
+              ["fanFrequencyHz", "Frecuencia de ventilador/VFD (Hz)"],
+              ["modulationPositionDegrees", "Posición de modulación (°)"],
+              ["flueGasTemperatureC", "Temperatura de gases de chimenea (°C)"],
+              ["o2Percent", "O₂ (%)"],
+              ["coPpm", "CO (ppm)"],
+              ["co2Percent", "CO₂ (%)"],
+              ["excessAirPercent", "Exceso de aire (%)"],
+              ["estimatedEfficiencyPercent", "Eficiencia estimada (%)"],
+              ["steamFlowKgH", "Flujo de vapor (kg/h)"],
             ].map(([name, label]) => (
               <div key={name}>
                 <Label>{label}</Label>
@@ -226,12 +271,39 @@ export default function NewLogPage() {
               </div>
             ))}
             <div>
-              <Label>Bomba alimentación</Label>
+              <Label>{fuelPressureLabel}</Label>
+              <Input name="fuelPressureValue" type="number" step="any" />
+            </div>
+            <div>
+              <Label>{fuelConsumptionLabel}</Label>
+              <Input name="fuelConsumptionValue" type="number" step="any" />
+              {effectiveFuel && allowsFuelConsumptionUnitSelection(effectiveFuel) && (
+                <Select
+                  className="mt-1"
+                  value={fuelConsumptionUnit}
+                  onChange={(e) => setFuelConsumptionUnit(e.target.value)}
+                >
+                  <option value="M3N">m³N</option>
+                  <option value="L">L</option>
+                  <option value="KG">kg</option>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Estado bomba de alimentación</Label>
               <Input name="feedPumpStatus" />
             </div>
             <div>
-              <Label>Bomba alterna</Label>
+              <Label>Presión de bomba de alimentación (kg/cm²)</Label>
+              <Input name="feedPumpPressureKgCm2" type="number" step="any" />
+            </div>
+            <div>
+              <Label>Estado bomba alterna</Label>
               <Input name="alternatePumpStatus" />
+            </div>
+            <div>
+              <Label>Presión de bomba alterna (kg/cm²)</Label>
+              <Input name="alternatePumpPressureKgCm2" type="number" step="any" />
             </div>
           </div>
         </Card>
@@ -240,13 +312,13 @@ export default function NewLogPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ["ph", "pH"],
-              ["conductivity", "Conductividad"],
-              ["tds", "TDS"],
-              ["hardness", "Dureza"],
-              ["sulfites", "Sulfitos"],
-              ["phosphates", "Fosfatos"],
-              ["alkalinity", "Alcalinidad"],
-              ["chlorides", "Cloruros"],
+              ["conductivityUsCm", "Conductividad (μS/cm)"],
+              ["tdsPpm", "TDS (ppm)"],
+              ["hardnessPpmAsCaCO3", "Dureza total (ppm como CaCO₃)"],
+              ["sulfitesPpm", "Sulfitos (ppm)"],
+              ["phosphatesPpm", "Fosfatos (ppm)"],
+              ["alkalinityPpmAsCaCO3", "Alcalinidad (ppm como CaCO₃)"],
+              ["chloridesPpm", "Cloruros (ppm)"],
             ].map(([name, label]) => (
               <div key={name}>
                 <Label>{label}</Label>
@@ -278,19 +350,12 @@ export default function NewLogPage() {
             {checklist.map((item, i) => (
               <div key={item.itemKey} className="grid gap-2 rounded border border-slate-100 p-3 sm:grid-cols-3">
                 <p className="text-sm font-medium text-slate-700">{item.itemLabel}</p>
-                <Select
-                  value={item.response}
-                  onChange={(e) => updateChecklist(i, "response", e.target.value)}
-                >
+                <Select value={item.response} onChange={(e) => updateChecklist(i, "response", e.target.value)}>
                   <option value="CUMPLE">Cumple</option>
                   <option value="NO_CUMPLE">No cumple</option>
                   <option value="NO_APLICA">No aplica</option>
                 </Select>
-                <Input
-                  placeholder="Observación"
-                  value={item.observation}
-                  onChange={(e) => updateChecklist(i, "observation", e.target.value)}
-                />
+                <Input placeholder="Observación" value={item.observation} onChange={(e) => updateChecklist(i, "observation", e.target.value)} />
               </div>
             ))}
           </div>
@@ -298,18 +363,9 @@ export default function NewLogPage() {
 
         <Card title="Eventos y observaciones">
           <div className="grid gap-4">
-            <div>
-              <Label>Observaciones generales</Label>
-              <Textarea name="generalObservations" rows={2} />
-            </div>
-            <div>
-              <Label>Condición anormal</Label>
-              <Textarea name="abnormalCondition" rows={2} />
-            </div>
-            <div>
-              <Label>Acción correctiva inmediata</Label>
-              <Textarea name="immediateCorrectiveAction" rows={2} />
-            </div>
+            <div><Label>Observaciones generales</Label><Textarea name="generalObservations" rows={2} /></div>
+            <div><Label>Condición anormal</Label><Textarea name="abnormalCondition" rows={2} /></div>
+            <div><Label>Acción correctiva inmediata</Label><Textarea name="immediateCorrectiveAction" rows={2} /></div>
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="requiresMaintenance" className="rounded" />

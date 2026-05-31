@@ -24,6 +24,7 @@ export async function PATCH(
     data: {
       ...(parsed.data.name ? { name: parsed.data.name.trim() } : {}),
       ...(parsed.data.status ? { status: parsed.data.status } : {}),
+      ...(parsed.data.logoUrl !== undefined ? { logoUrl: parsed.data.logoUrl } : {}),
     },
     include: {
       _count: { select: { users: true, boilers: true } },

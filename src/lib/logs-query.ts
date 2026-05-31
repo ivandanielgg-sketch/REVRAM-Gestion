@@ -53,10 +53,17 @@ export function buildLogsWhere(
   }
 
   if (filters.plantId || filters.fuelType || filters.boilerType) {
-    where.boiler = {};
-    if (filters.plantId) where.boiler.plantId = filters.plantId;
-    if (filters.fuelType) where.boiler.fuelType = filters.fuelType as Prisma.EnumFuelTypeFilter["equals"];
-    if (filters.boilerType) where.boiler.type = filters.boilerType as Prisma.EnumBoilerTypeFilter["equals"];
+    const boilerFilter: Prisma.BoilerWhereInput = {};
+    if (session) {
+      const companyPart = mergeCompanyLogWhere(session);
+      if (companyPart.boiler && typeof companyPart.boiler === "object") {
+        Object.assign(boilerFilter, companyPart.boiler);
+      }
+    }
+    if (filters.plantId) boilerFilter.plantId = filters.plantId;
+    if (filters.fuelType) boilerFilter.fuelType = filters.fuelType as Prisma.EnumFuelTypeFilter["equals"];
+    if (filters.boilerType) boilerFilter.type = filters.boilerType as Prisma.EnumBoilerTypeFilter["equals"];
+    where.boiler = boilerFilter;
   }
 
   return where;

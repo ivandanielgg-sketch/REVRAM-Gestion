@@ -60,9 +60,9 @@ interface DailyLog {
   logDate: string;
   shift: string;
   status: string;
-  steamPressure: number | null;
-  steamTemperature: number | null;
-  waterLevel: number | null;
+  steamPressureKgCm2: number | null;
+  steamTemperatureC: number | null;
+  waterLevelPercent: number | null;
   operationalState: string;
   boiler: { name: string };
   operator: { username: string };
@@ -376,9 +376,9 @@ function DailyView({ data, hasRange }: { data: DailyReport; hasRange: boolean })
             formatDate(l.logDate, true),
             l.boiler.name,
             l.shift,
-            l.steamPressure != null ? `${l.steamPressure} psi` : null,
-            l.steamTemperature != null ? `${l.steamTemperature} °C` : null,
-            l.waterLevel != null ? `${l.waterLevel} %` : null,
+            l.steamPressureKgCm2 != null ? `${l.steamPressureKgCm2} kg/cm²` : null,
+            l.steamTemperatureC != null ? `${l.steamTemperatureC} °C` : null,
+            l.waterLevelPercent != null ? `${l.waterLevelPercent} %` : null,
             l.operator.username,
             LOG_STATUS_LABELS[l.status] || l.status,
           ])}
@@ -432,8 +432,8 @@ function LogsView({ logs }: { logs: DailyLog[] }) {
           formatDate(l.logDate, true),
           l.boiler.name,
           l.shift,
-          l.steamPressure != null ? `${l.steamPressure} psi` : null,
-          l.waterLevel != null ? `${l.waterLevel} %` : null,
+          l.steamPressureKgCm2 != null ? `${l.steamPressureKgCm2} kg/cm²` : null,
+          l.waterLevelPercent != null ? `${l.waterLevelPercent} %` : null,
           l.operator.username,
           LOG_STATUS_LABELS[l.status] || l.status,
         ])}
