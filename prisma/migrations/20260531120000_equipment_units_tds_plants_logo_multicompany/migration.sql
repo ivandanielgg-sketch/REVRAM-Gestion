@@ -26,6 +26,58 @@ UPDATE "Plant"
 SET "normalizedName" = LOWER(TRIM(REGEXP_REPLACE("name", '\s+', ' ', 'g')))
 WHERE "normalizedName" IS NULL;
 
+-- Resolve pre-existing duplicate plants (same company + normalized name) before unique index.
+-- Keep the oldest record; reassign boilers; archive duplicates with a suffixed normalizedName.
+WITH ranked_plants AS (
+  SELECT
+    id,
+    "companyId",
+    "normalizedName",
+    ROW_NUMBER() OVER (
+      PARTITION BY "companyId", "normalizedName"
+      ORDER BY "createdAt" ASC, id ASC
+    ) AS rn
+  FROM "Plant"
+  WHERE "companyId" IS NOT NULL
+    AND "normalizedName" IS NOT NULL
+),
+duplicate_map AS (
+  SELECT
+    r.id AS duplicate_id,
+    k.id AS keeper_id
+  FROM ranked_plants r
+  JOIN ranked_plants k
+    ON k."companyId" = r."companyId"
+   AND k."normalizedName" = r."normalizedName"
+   AND k.rn = 1
+  WHERE r.rn > 1
+)
+UPDATE "Boiler" b
+SET "plantId" = d.keeper_id
+FROM duplicate_map d
+WHERE b."plantId" = d.duplicate_id;
+
+WITH ranked_plants AS (
+  SELECT
+    id,
+    "normalizedName",
+    ROW_NUMBER() OVER (
+      PARTITION BY "companyId", "normalizedName"
+      ORDER BY "createdAt" ASC, id ASC
+    ) AS rn
+  FROM "Plant"
+  WHERE "companyId" IS NOT NULL
+    AND "normalizedName" IS NOT NULL
+)
+UPDATE "Plant" p
+SET
+  "status" = 'DISABLED',
+  "deletedAt" = COALESCE(p."deletedAt", NOW()),
+  "normalizedName" = p."normalizedName" || '__archived__' || p.id
+FROM ranked_plants r
+WHERE p.id = r.id
+  AND r.rn > 1;
+
 ALTER TABLE "Plant" ALTER COLUMN "normalizedName" SET NOT NULL;
 ALTER TABLE "Plant" ALTER COLUMN "client" DROP NOT NULL;
 
