@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm run start
-    preDeployCommand: npm run db:deploy && npm run ensure-users
+    preDeployCommand: npm run predeploy
     envVars:
       - key: NODE_ENV
         value: production
